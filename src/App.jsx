@@ -767,7 +767,7 @@ function Dashboard({operators,streamers,allWeeks}){
         </div>
       </div>
 
-      <div style={{background:"#0f172a",borderRadius:14,padding:16,marginBottom:14,border:"1px solid #1e293b"}}><div style={{color:"#f1f5f9",fontWeight:800,fontSize:13,marginBottom:4}}>📊 本周数据概览（场均）</div><div style={{color:"#475569",fontSize:11,marginBottom:11}}>{TW} vs 上周 {LW}</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><KPI field="exposure" label="曝光（场均）" color="#A855F7"/><KPI field="uv" label="UV（场观）" color="#6366F1"/><KPI field="acu" label="ACU" color="#10B981"/><KPI field="peak" label="峰值在线" color="#F59E0B"/><KPI field="stay" label="停留(s)" color="#14B8A6"/><KPI field="interact" label="互动率%" color="#EC4899"/><KPI field="fans" label="粉丝净增" color="#84CC16"/></div></div>
+      <div style={{background:"#0f172a",borderRadius:14,padding:16,marginBottom:14,border:"1px solid #1e293b"}}><div style={{color:"#f1f5f9",fontWeight:800,fontSize:13,marginBottom:4}}>📊 本周数据概览（场均）</div><div style={{color:"#475569",fontSize:11,marginBottom:11}}>{TW} vs 上周 {LW}</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><KPI field="uv" label="UV（场观）" color="#6366F1"/><KPI field="acu" label="ACU" color="#10B981"/><KPI field="peak" label="峰值在线" color="#F59E0B"/><KPI field="stay" label="人均观看(min)" color="#14B8A6"/></div></div>
       <div style={{background:"#0f172a",borderRadius:14,padding:16,marginBottom:14,border:"1px solid #1e293b"}}><div style={{color:"#f1f5f9",fontWeight:800,fontSize:13,marginBottom:4}}>🏆 本周主播 UV 排行 TOP 15</div><div style={{color:"#475569",fontSize:11,marginBottom:11}}>{TW}</div>{(()=>{const wUV=filt.map(s=>{const op=operators.find(o=>o.id===s.opId);const d=weekData[s.opId+"__"+TW];const uv=parseFloat(d?.records?.[s.id]?.uv)||0;const ld=weekData[s.opId+"__"+LW];const luv=parseFloat(ld?.records?.[s.id]?.uv)||0;return{...s,uv,luv,opColor:op?.color||"#6366F1",live:isLiveEnough(d?.records?.[s.id]?.liveDuration)};}).sort((a,b)=>b.uv-a.uv).slice(0,15);const mx=wUV[0]?.uv||1;return wUV.map((s,i)=>{const d2=s.luv?s.uv-s.luv:null;return(<div key={s.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:7}}><div style={{width:20,color:i<3?"#F59E0B":"#475569",fontWeight:800,fontSize:12,textAlign:"center",flexShrink:0}}>{i+1}</div><div style={{width:90,color:"#f1f5f9",fontSize:12,fontWeight:700,flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>{s.live&&<span style={{background:"#10B98122",color:"#10B981",fontSize:9,padding:"1px 5px",borderRadius:4,fontWeight:700,flexShrink:0}}>开播✓</span>}<div style={{flex:1,background:"#1e293b",borderRadius:4,height:6,overflow:"hidden"}}><div style={{width:(s.uv?Math.round((s.uv/mx)*100):0)+"%",height:"100%",background:s.opColor,borderRadius:4}}/></div><div style={{width:58,color:"#6366F1",fontWeight:700,fontSize:12,textAlign:"right",flexShrink:0}}>{s.uv?s.uv.toLocaleString():"--"}</div>{d2!==null&&<div style={{width:50,color:d2>=0?"#10B981":"#EF4444",fontSize:11,textAlign:"right",flexShrink:0}}>{d2>=0?"▲":"▼"}{Math.abs(d2).toLocaleString()}</div>}</div>);});})()}</div>
       <div style={{background:"#0f172a",borderRadius:14,padding:16,border:"1px solid #1e293b"}}><div style={{color:"#f1f5f9",fontWeight:800,fontSize:13,marginBottom:12}}>📈 本周评级分布</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{RATING_OPTIONS.map(r=>{const cnt=filt.filter(s=>{const d=weekData[s.opId+"__"+TW];return d?.records?.[s.id]?.rating===r;}).length;return(<div key={r} style={{background:RATING_COLORS[r]+"22",border:"1px solid "+RATING_COLORS[r]+"44",borderRadius:10,padding:"9px 12px",textAlign:"center",minWidth:48}}><div style={{color:RATING_COLORS[r],fontWeight:900,fontSize:15}}>{r}</div><div style={{color:"#94a3b8",fontSize:17,fontWeight:700}}>{cnt}</div><div style={{color:"#475569",fontSize:10}}>人</div></div>);})}<div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"9px 12px",textAlign:"center",minWidth:48}}><div style={{color:"#64748B",fontWeight:900,fontSize:15}}>-</div><div style={{color:"#94a3b8",fontSize:17,fontWeight:700}}>{filt.filter(s=>{const d=weekData[s.opId+"__"+TW];return !d?.records?.[s.id]?.rating;}).length}</div><div style={{color:"#475569",fontSize:10}}>未填</div></div></div></div>
     </>)}
@@ -990,9 +990,19 @@ export default function App(){
   useEffect(()=>{
     Promise.all([dbGet("__operators__"),dbGet("__streamers__"),dbGet("__weeks_idx__")]).then(async([ops,strs,idx])=>{
       if(ops)setOperators(ops);
-      if(strs){setStreamers(strs);}
+      if(strs){
+        // Check if coop streamers need to be added (migration)
+        const hasCoop=strs.some(s=>s.group==="合作");
+        if(!hasCoop){
+          const merged=[...strs,...COOP_STREAMERS];
+          await dbSet("__streamers__",merged);
+          setStreamers(merged);
+        } else {
+          setStreamers(strs);
+        }
+      }
       else{
-        // First run: parse and save the 157 streamers
+        // First run: parse and save all streamers
         const initStrs=[...parseStreamersCSV(STREAMER_CSV),...COOP_STREAMERS];
         await dbSet("__streamers__",initStrs);
         setStreamers(initStrs);
@@ -1006,7 +1016,7 @@ export default function App(){
   const handleSaveManage=async(ops,strs)=>{setOperators(ops);setStreamers(strs);await dbSet("__operators__",ops);await dbSet("__streamers__",strs);setShowManage(false);if(!ops.find(o=>o.id===currentOpId))setCurrentOpId(ops[0]?.id||"");};
   const handleImport=async(rows,opId)=>{const newStrs=[...streamers];const weekKey=selectedWeek?getWeekKey(opId,selectedWeek):null;let wRec=weekKey?await dbGet(weekKey)||{records:{},teamNote:{good:"",issue:""}}:{records:{},teamNote:{good:"",issue:""}};rows.forEach(r=>{const ex=newStrs.find(s=>s.tid===r.tid||s.name===r.name);if(!ex)newStrs.push({id:r.id,name:r.name,tid:r.tid,phone:r.phone,realname:r.realname,group:r.group,opId,operator:operators.find(o=>o.id===opId)?.name||"",deleted:false,signDate:r.signDate||"",firstLiveDate:r.firstLiveDate||""});const sid=ex?.id||r.id;if(weekKey)wRec.records[sid]=r._weekData;});setStreamers(newStrs);await dbSet("__streamers__",newStrs);if(weekKey)await dbSet(weekKey,wRec);};
   const pdc=streamers.filter(s=>s.deleteRequested).length;
-  const TABS=[{key:"dashboard",l:"📊 数据面板"},{key:"weekly",l:"📋 周复盘"},{key:"monthly",l:"📅 月复盘"},{key:"trend",l:"📈 趋势"}];
+  const TABS=[{key:"dashboard",l:"📊 数据面板"},{key:"weekly",l:"📋 周复盘"},{key:"monthly",l:"📅 月复盘"},{key:"roster",l:"👥 主播花名册"},{key:"trend",l:"📈 趋势"}];
   if(booting)return(<div style={{minHeight:"100vh",background:"#020817",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",color:"#475569"}}><div style={{fontSize:40,marginBottom:16}}>⏳</div><div style={{fontSize:16,fontFamily:"'Noto Sans SC',sans-serif"}}>连接数据库中...</div></div></div>);
   return(<div style={{minHeight:"100vh",background:"#020817",fontFamily:"'Noto Sans SC',sans-serif",color:"#f1f5f9"}}>
     {showAdminLogin&&<AdminLoginModal onSuccess={()=>{setIsAdmin(true);setShowAdminLogin(false);}} onClose={()=>setShowAdminLogin(false)}/>}
