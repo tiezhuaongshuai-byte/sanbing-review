@@ -273,11 +273,14 @@ function ImportModal({operators,currentOpId,onImport,onClose,streamers,selectedW
   // Normalize date range to system format "M.DD - M.DD"
   const normalizeDate=raw=>{
     if(!raw)return null;const s=String(raw).trim();
-    // "4月13日-4月19日"
-    let m=s.match(/(\d+)月(\d+)日[-–](\d+)月(\d+)日/);
+    // "4月13日-4月19日" or "3月30-4月5日" (missing 日 after first date)
+    let m=s.match(/(\d+)月(\d+)日?[-–](\d+)月(\d+)日?/);
     if(m)return `${parseInt(m[1])}.${m[2].padStart(2,"0")} - ${parseInt(m[3])}.${m[4].padStart(2,"0")}`;
-    // "12.1-12.7"
+    // "12.1-12.7" or "12.01-12.07"
     m=s.match(/(\d+)\.(\d+)[-–](\d+)\.(\d+)/);
+    if(m)return `${parseInt(m[1])}.${m[2].padStart(2,"0")} - ${parseInt(m[3])}.${m[4].padStart(2,"0")}`;
+    // "3.30 - 4.05" (already normalized)
+    m=s.match(/^(\d+)\.(\d+)\s*-\s*(\d+)\.(\d+)$/);
     if(m)return `${parseInt(m[1])}.${m[2].padStart(2,"0")} - ${parseInt(m[3])}.${m[4].padStart(2,"0")}`;
     return null;
   };
@@ -311,10 +314,12 @@ function ImportModal({operators,currentOpId,onImport,onClose,streamers,selectedW
         if(col0!==null&&col0!=="序列"){
           const nd=normalizeDate(String(col0));
           if(nd){currentWeek=nd;weeks[currentWeek]=[];continue;}
-          // Also handle "三冰线上主播-X.X-X.X" format
-          const m=String(col0).match(/[\d.月日年-]+/);
-          if(m&&String(col0).includes("三冰")){
-            const nd2=normalizeDate(String(col0).replace(/三冰线上主播[-\s]*/,"").replace(/在会主播[\d月日\s]*/,""));
+          // Also handle "在会主播3月30日-4月5日日周数据" or "三冰线上主播-12.22-28" format
+          const col0str=String(col0);
+          // Extract date range from title strings
+          const dateInTitle=col0str.match(/(\d+月\d+日?[-–]\d+月\d+日?)/)||col0str.match(/(\d+\.\d+[-–]\d+\.\d+)/);
+          if(dateInTitle){
+            const nd2=normalizeDate(dateInTitle[1]);
             if(nd2){currentWeek=nd2;weeks[currentWeek]=[];continue;}
           }
         }
