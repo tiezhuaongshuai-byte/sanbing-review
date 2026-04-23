@@ -303,9 +303,26 @@ function Dashboard({operators,streamers,allWeeks}){
     <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}><span style={{color:"#64748B",fontSize:13}}>查看维度：</span><button onClick={()=>setViewOp("all")} style={{padding:"5px 12px",borderRadius:18,border:"1px solid "+(viewOp==="all"?"#6366F1":"#334155"),background:viewOp==="all"?"#6366F1":"#1e293b",color:viewOp==="all"?"#fff":"#94a3b8",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans SC',sans-serif"}}>全部</button>{operators.map(op=>(<button key={op.id} onClick={()=>setViewOp(op.id)} style={{padding:"5px 12px",borderRadius:18,border:"1px solid "+(viewOp===op.id?op.color:"#334155"),background:viewOp===op.id?op.color:"#1e293b",color:viewOp===op.id?"#fff":"#94a3b8",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans SC',sans-serif"}}>{op.name}</button>))}</div>
     {loading?(<div style={{textAlign:"center",padding:"60px 0",color:"#475569"}}><div style={{fontSize:32,marginBottom:10}}>⏳</div><div>加载中...</div></div>):(<>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-        <div style={{background:"#0f172a",borderRadius:14,padding:18,border:"1px solid #6366F133"}}><div style={{color:"#6366F1",fontSize:12,fontWeight:700,marginBottom:4}}>📊 UV 合计（场观总和）</div><div style={{color:"#94a3b8",fontSize:11,marginBottom:10}}>{TW}</div><div style={{display:"flex",gap:18,flexWrap:"wrap"}}><div><div style={{color:"#475569",fontSize:11,marginBottom:3}}>{viewOp==="all"?"全团队":"本运营"}</div><div style={{color:"#f1f5f9",fontSize:24,fontWeight:900}}>{tUV>0?tUV.toLocaleString():"--"}</div>{uvD!==0&&lUV>0&&<div style={{color:uvD>=0?"#10B981":"#EF4444",fontSize:12,fontWeight:700}}>{uvD>=0?"▲":"▼"}{Math.abs(uvD).toLocaleString()} {uvP&&"("+(uvD>=0?"+":"")+uvP+"%)"}</div>}</div>{viewOp!=="all"&&<div><div style={{color:"#475569",fontSize:11,marginBottom:3}}>全团队</div><div style={{color:"#64748B",fontSize:20,fontWeight:700}}>{aUV>0?aUV.toLocaleString():"--"}</div></div>}</div></div>
-        <div style={{background:"#0f172a",borderRadius:14,padding:18,border:"1px solid #10B98133"}}><div style={{color:"#10B981",fontSize:12,fontWeight:700,marginBottom:4}}>🎙️ 开播统计（≥1小时）</div><div style={{color:"#94a3b8",fontSize:11,marginBottom:10}}>{TW}</div><div style={{display:"flex",gap:18,flexWrap:"wrap"}}><div><div style={{color:"#475569",fontSize:11,marginBottom:3}}>开播人数</div><div style={{color:"#f1f5f9",fontSize:22,fontWeight:900}}>{tLive}<span style={{fontSize:13,color:"#64748B"}}> / {filt.length}</span></div>{livD!==0&&<div style={{color:livD>=0?"#10B981":"#EF4444",fontSize:12,fontWeight:700}}>{livD>=0?"▲":"▼"}{Math.abs(livD)} 人 vs上周</div>}</div><div><div style={{color:"#475569",fontSize:11,marginBottom:3}}>总开播时长</div><div style={{color:"#f1f5f9",fontSize:20,fontWeight:700}}>{tH>0?tH.toFixed(1):"--"}<span style={{fontSize:12,color:"#64748B"}}> h</span></div>{hD!==0&&lH>0&&<div style={{color:hD>=0?"#10B981":"#EF4444",fontSize:12,fontWeight:700}}>{hD>=0?"▲":"▼"}{Math.abs(hD).toFixed(1)}h vs上周</div>}</div>{viewOp!=="all"&&<div><div style={{color:"#475569",fontSize:11,marginBottom:3}}>全团队</div><div style={{color:"#64748B",fontSize:18,fontWeight:700}}>{aLive} 人</div></div>}</div></div>
+        <div style={{background:"#0f172a",borderRadius:14,padding:16,border:"1px solid #6366F133"}}>
+          <div style={{color:"#6366F1",fontSize:12,fontWeight:700,marginBottom:3}}>🏛️ 在会主播</div>
+          <div style={{color:"#94a3b8",fontSize:10,marginBottom:10}}>{TW}</div>
+          <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+            <div><div style={{color:"#475569",fontSize:10,marginBottom:2}}>UV合计</div><div style={{color:"#6366F1",fontSize:22,fontWeight:900}}>{(()=>{const v=filt.filter(s=>s.group!=="合作").reduce((sum,s)=>sum+(parseFloat(weekData[s.opId+"__"+TW]?.records?.[s.id]?.uv)||0),0);return v>0?v.toLocaleString():"--";})()}</div></div>
+            <div><div style={{color:"#475569",fontSize:10,marginBottom:2}}>开播人数（≥1h）</div><div style={{color:"#10B981",fontSize:22,fontWeight:900}}>{filt.filter(s=>s.group!=="合作"&&isLiveEnough(weekData[s.opId+"__"+TW]?.records?.[s.id]?.liveDuration)).length}<span style={{color:"#334155",fontSize:12}}>/{filt.filter(s=>s.group!=="合作").length}</span></div></div>
+            <div><div style={{color:"#475569",fontSize:10,marginBottom:2}}>总时长</div><div style={{color:"#F59E0B",fontSize:18,fontWeight:700}}>{(()=>{const h=filt.filter(s=>s.group!=="合作").reduce((sum,s)=>sum+(parseFloat(weekData[s.opId+"__"+TW]?.records?.[s.id]?.liveDuration)||0),0);return h>0?h.toFixed(1)+"h":"--";})()}</div></div>
+          </div>
+        </div>
+        <div style={{background:"#0f172a",borderRadius:14,padding:16,border:"1px solid #10B98133"}}>
+          <div style={{color:"#10B981",fontSize:12,fontWeight:700,marginBottom:3}}>🤝 合作主播</div>
+          <div style={{color:"#94a3b8",fontSize:10,marginBottom:10}}>{TW}</div>
+          <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+            <div><div style={{color:"#475569",fontSize:10,marginBottom:2}}>UV合计</div><div style={{color:"#6366F1",fontSize:22,fontWeight:900}}>{(()=>{const v=filt.filter(s=>s.group==="合作").reduce((sum,s)=>sum+(parseFloat(weekData[s.opId+"__"+TW]?.records?.[s.id]?.uv)||0),0);return v>0?v.toLocaleString():"--";})()}</div></div>
+            <div><div style={{color:"#475569",fontSize:10,marginBottom:2}}>开播人数（≥1h）</div><div style={{color:"#10B981",fontSize:22,fontWeight:900}}>{filt.filter(s=>s.group==="合作"&&isLiveEnough(weekData[s.opId+"__"+TW]?.records?.[s.id]?.liveDuration)).length}<span style={{color:"#334155",fontSize:12}}>/{filt.filter(s=>s.group==="合作").length}</span></div></div>
+            <div><div style={{color:"#475569",fontSize:10,marginBottom:2}}>总时长</div><div style={{color:"#F59E0B",fontSize:18,fontWeight:700}}>{(()=>{const h=filt.filter(s=>s.group==="合作").reduce((sum,s)=>sum+(parseFloat(weekData[s.opId+"__"+TW]?.records?.[s.id]?.liveDuration)||0),0);return h>0?h.toFixed(1)+"h":"--";})()}</div></div>
+          </div>
+        </div>
       </div>
+
       <div style={{background:"#0f172a",borderRadius:14,padding:16,marginBottom:14,border:"1px solid #1e293b"}}><div style={{color:"#f1f5f9",fontWeight:800,fontSize:13,marginBottom:4}}>📊 本周数据概览（场均）</div><div style={{color:"#475569",fontSize:11,marginBottom:11}}>{TW} vs 上周 {LW}</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><KPI field="exposure" label="曝光（场均）" color="#A855F7"/><KPI field="uv" label="UV（场观）" color="#6366F1"/><KPI field="acu" label="ACU" color="#10B981"/><KPI field="peak" label="峰值在线" color="#F59E0B"/><KPI field="stay" label="停留(s)" color="#14B8A6"/><KPI field="interact" label="互动率%" color="#EC4899"/><KPI field="fans" label="粉丝净增" color="#84CC16"/></div></div>
       <div style={{background:"#0f172a",borderRadius:14,padding:16,marginBottom:14,border:"1px solid #1e293b"}}><div style={{color:"#f1f5f9",fontWeight:800,fontSize:13,marginBottom:4}}>🏆 本周主播 UV 排行 TOP 15</div><div style={{color:"#475569",fontSize:11,marginBottom:11}}>{TW}</div>{(()=>{const wUV=filt.map(s=>{const op=operators.find(o=>o.id===s.opId);const d=weekData[s.opId+"__"+TW];const uv=parseFloat(d?.records?.[s.id]?.uv)||0;const ld=weekData[s.opId+"__"+LW];const luv=parseFloat(ld?.records?.[s.id]?.uv)||0;return{...s,uv,luv,opColor:op?.color||"#6366F1",live:isLiveEnough(d?.records?.[s.id]?.liveDuration)};}).sort((a,b)=>b.uv-a.uv).slice(0,15);const mx=wUV[0]?.uv||1;return wUV.map((s,i)=>{const d2=s.luv?s.uv-s.luv:null;return(<div key={s.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:7}}><div style={{width:20,color:i<3?"#F59E0B":"#475569",fontWeight:800,fontSize:12,textAlign:"center",flexShrink:0}}>{i+1}</div><div style={{width:90,color:"#f1f5f9",fontSize:12,fontWeight:700,flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>{s.live&&<span style={{background:"#10B98122",color:"#10B981",fontSize:9,padding:"1px 5px",borderRadius:4,fontWeight:700,flexShrink:0}}>开播✓</span>}<div style={{flex:1,background:"#1e293b",borderRadius:4,height:6,overflow:"hidden"}}><div style={{width:(s.uv?Math.round((s.uv/mx)*100):0)+"%",height:"100%",background:s.opColor,borderRadius:4}}/></div><div style={{width:58,color:"#6366F1",fontWeight:700,fontSize:12,textAlign:"right",flexShrink:0}}>{s.uv?s.uv.toLocaleString():"--"}</div>{d2!==null&&<div style={{width:50,color:d2>=0?"#10B981":"#EF4444",fontSize:11,textAlign:"right",flexShrink:0}}>{d2>=0?"▲":"▼"}{Math.abs(d2).toLocaleString()}</div>}</div>);});})()}</div>
       <div style={{background:"#0f172a",borderRadius:14,padding:16,border:"1px solid #1e293b"}}><div style={{color:"#f1f5f9",fontWeight:800,fontSize:13,marginBottom:12}}>📈 本周评级分布</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{RATING_OPTIONS.map(r=>{const cnt=filt.filter(s=>{const d=weekData[s.opId+"__"+TW];return d?.records?.[s.id]?.rating===r;}).length;return(<div key={r} style={{background:RATING_COLORS[r]+"22",border:"1px solid "+RATING_COLORS[r]+"44",borderRadius:10,padding:"9px 12px",textAlign:"center",minWidth:48}}><div style={{color:RATING_COLORS[r],fontWeight:900,fontSize:15}}>{r}</div><div style={{color:"#94a3b8",fontSize:17,fontWeight:700}}>{cnt}</div><div style={{color:"#475569",fontSize:10}}>人</div></div>);})}<div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"9px 12px",textAlign:"center",minWidth:48}}><div style={{color:"#64748B",fontWeight:900,fontSize:15}}>-</div><div style={{color:"#94a3b8",fontSize:17,fontWeight:700}}>{filt.filter(s=>{const d=weekData[s.opId+"__"+TW];return !d?.records?.[s.id]?.rating;}).length}</div><div style={{color:"#475569",fontSize:10}}>未填</div></div></div></div>
@@ -314,43 +331,180 @@ function Dashboard({operators,streamers,allWeeks}){
 }
 
 function WeeklyView({weekKey,myStreamers}){
-  const[data,setData]=useState({});const[teamNote,setTeamNote]=useState({good:"",issue:""});const[saving,setSaving]=useState(false);const[saved,setSaved]=useState(false);const[loading,setLoading]=useState(false);
+  const[data,setData]=useState({});const[teamNote,setTeamNote]=useState({good:"",issue:""});
+  const[saving,setSaving]=useState(false);const[saved,setSaved]=useState(false);const[loading,setLoading]=useState(false);
+  const[subTab,setSubTab]=useState("guild"); // "guild" | "coop"
+
   useEffect(()=>{if(!weekKey)return;setLoading(true);setData({});setTeamNote({good:"",issue:""});dbGet(weekKey).then(d=>{if(d){setData(d.records||{});setTeamNote(d.teamNote||{good:"",issue:""});}setLoading(false);});},[weekKey]);
   const upd=(sid,f,v)=>setData(p=>({...p,[sid]:{...(p[sid]||EMPTY_REC()),[f]:v}}));
   const save2=async()=>{if(!weekKey)return;setSaving(true);await dbSet(weekKey,{records:data,teamNote,savedAt:new Date().toISOString()});setSaving(false);setSaved(true);setTimeout(()=>setSaved(false),2200);};
-  const active=myStreamers.filter(s=>!s.deleted&&!s.deleteRequested);
-  const grouped=DEFAULT_GROUPS.map(g=>({group:g,members:active.filter(s=>s.group===g)})).filter(g=>g.members.length>0);
-  const tUV=active.reduce((sum,s)=>sum+(parseFloat(data[s.id]?.uv)||0),0);
-  const lCnt=active.filter(s=>isLiveEnough(data[s.id]?.liveDuration)).length;
-  const tH=active.reduce((sum,s)=>sum+(parseFloat(data[s.id]?.liveDuration)||0),0);
+
+  // Split by group
+  const guildStrs=myStreamers.filter(s=>!s.deleted&&!s.deleteRequested&&s.group!=="合作");
+  const coopStrs=myStreamers.filter(s=>!s.deleted&&!s.deleteRequested&&s.group==="合作");
+  const activeStrs=subTab==="guild"?guildStrs:coopStrs;
+
+  // Guild summary
+  const guildUV=guildStrs.reduce((sum,s)=>sum+(parseFloat(data[s.id]?.uv)||0),0);
+  const guildLive=guildStrs.filter(s=>isLiveEnough(data[s.id]?.liveDuration)).length;
+  const guildHours=guildStrs.reduce((sum,s)=>sum+(parseFloat(data[s.id]?.liveDuration)||0),0);
+  // Coop summary
+  const coopUV=coopStrs.reduce((sum,s)=>sum+(parseFloat(data[s.id]?.uv)||0),0);
+  const coopLive=coopStrs.filter(s=>isLiveEnough(data[s.id]?.liveDuration)).length;
+  const coopHours=coopStrs.reduce((sum,s)=>sum+(parseFloat(data[s.id]?.liveDuration)||0),0);
+
+  const grouped=DEFAULT_GROUPS.filter(g=>g!=="合作").map(g=>({group:g,members:guildStrs.filter(s=>s.group===g)})).filter(g=>g.members.length>0);
   const CD="#3B82F6",CC="#10B981",CR="#8B5CF6";
+
+  // Data fields for guild streamers (full)
+  const GUILD_FIELDS=[
+    {key:"liveDuration",short:"开播时长\n(h)",w:72,ph:"0"},
+    {key:"exposure",short:"曝光",w:70,ph:"0"},
+    {key:"uv",short:"UV\n(场观)",w:70,ph:"0"},
+    {key:"acu",short:"ACU",w:65,ph:"0"},
+    {key:"peak",short:"PCU\n峰值",w:65,ph:"0"},
+    {key:"stay",short:"停留\n(s)",w:65,ph:"0"},
+    {key:"interact",short:"互动率\n%",w:60,ph:"0"},
+    {key:"fans",short:"粉丝\n净增",w:60,ph:"0"},
+  ];
+  // Data fields for coop streamers (simplified)
+  const COOP_FIELDS=[
+    {key:"liveDuration",short:"直播时长\n(h)",w:80,ph:"0"},
+    {key:"uv",short:"场观\nUV",w:80,ph:"0"},
+    {key:"acu",short:"ACU",w:75,ph:"0"},
+    {key:"fans",short:"粉丝\n净增",w:70,ph:"0"},
+  ];
+
   if(!weekKey)return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:380,color:"#334155"}}><div style={{textAlign:"center"}}><div style={{fontSize:46,marginBottom:12}}>📅</div><div style={{fontSize:17,fontWeight:700,color:"#475569",marginBottom:6}}>请先选择复盘周期</div></div></div>);
   if(loading)return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:300,color:"#475569"}}><div style={{textAlign:"center"}}><div style={{fontSize:32,marginBottom:12}}>⏳</div><div>加载中...</div></div></div>);
-  if(active.length===0)return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:280,color:"#334155"}}><div style={{textAlign:"center"}}><div style={{fontSize:38,marginBottom:10}}>🎮</div><div style={{fontSize:14,fontWeight:700,color:"#475569"}}>当前运营暂无归属主播</div></div></div>);
+
   return(<div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>{[{key:"good",l:"🔥 本周最值得全团队复用的内容动作",c:"#10B981"},{key:"issue",l:"⚠️ 本周需集中解决的共性问题",c:"#F59E0B"}].map(({key,l,c})=>(<div key={key} style={{background:"#0f172a",borderRadius:10,padding:13,border:"1px solid "+c+"33"}}><div style={{color:c,fontSize:11,fontWeight:700,marginBottom:6}}>{l}</div><textarea value={teamNote[key]} onChange={e=>setTeamNote(p=>({...p,[key]:e.target.value}))} placeholder="填写关键结论..." rows={2} style={{width:"100%",background:"transparent",border:"none",color:"#e2e8f0",fontSize:12,resize:"none",outline:"none",fontFamily:"'Noto Sans SC',sans-serif",boxSizing:"border-box"}}/></div>))}</div>
-    <div style={{display:"flex",gap:12,marginBottom:12,background:"#0f172a",borderRadius:10,padding:"11px 16px",border:"1px solid #1e293b",flexWrap:"wrap",alignItems:"center"}}>
-      <div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:"#64748B",fontSize:12}}>UV合计：</span><span style={{color:"#6366F1",fontWeight:800,fontSize:16}}>{tUV>0?tUV.toLocaleString():"--"}</span></div>
-      <div style={{width:1,height:18,background:"#1e293b"}}/>
-      <div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:"#64748B",fontSize:12}}>开播（≥1h）：</span><span style={{color:"#10B981",fontWeight:800,fontSize:16}}>{lCnt}<span style={{color:"#334155",fontSize:12}}> / {active.length}</span></span></div>
-      <div style={{width:1,height:18,background:"#1e293b"}}/>
-      <div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:"#64748B",fontSize:12}}>总时长：</span><span style={{color:"#F59E0B",fontWeight:800,fontSize:16}}>{tH>0?tH.toFixed(1):"--"}<span style={{color:"#334155",fontSize:12}}> h</span></span></div>
+    {/* Team notes */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+      {[{key:"good",l:"🔥 本周最值得全团队复用的内容动作",c:"#10B981"},{key:"issue",l:"⚠️ 本周需集中解决的共性问题",c:"#F59E0B"}].map(({key,l,c})=>(
+        <div key={key} style={{background:"#0f172a",borderRadius:10,padding:13,border:"1px solid "+c+"33"}}><div style={{color:c,fontSize:11,fontWeight:700,marginBottom:6}}>{l}</div><textarea value={teamNote[key]} onChange={e=>setTeamNote(p=>({...p,[key]:e.target.value}))} placeholder="填写关键结论..." rows={2} style={{width:"100%",background:"transparent",border:"none",color:"#e2e8f0",fontSize:12,resize:"none",outline:"none",fontFamily:"'Noto Sans SC',sans-serif",boxSizing:"border-box"}}/></div>
+      ))}
+    </div>
+
+    {/* Overall summary bar */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+      <div style={{background:"#0f172a",borderRadius:10,padding:"12px 16px",border:"1px solid #6366F133"}}>
+        <div style={{color:"#6366F1",fontSize:11,fontWeight:700,marginBottom:8}}>🏛️ 在会主播汇总</div>
+        <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+          <div><div style={{color:"#475569",fontSize:10}}>UV合计</div><div style={{color:"#6366F1",fontWeight:800,fontSize:18}}>{guildUV>0?guildUV.toLocaleString():"--"}</div></div>
+          <div><div style={{color:"#475569",fontSize:10}}>开播（≥1h）</div><div style={{color:"#10B981",fontWeight:800,fontSize:18}}>{guildLive}<span style={{color:"#334155",fontSize:12}}>/{ guildStrs.length}</span></div></div>
+          <div><div style={{color:"#475569",fontSize:10}}>总时长</div><div style={{color:"#F59E0B",fontWeight:800,fontSize:18}}>{guildHours>0?guildHours.toFixed(1):"--"}<span style={{color:"#334155",fontSize:12}}>h</span></div></div>
+        </div>
+      </div>
+      <div style={{background:"#0f172a",borderRadius:10,padding:"12px 16px",border:"1px solid #10B98133"}}>
+        <div style={{color:"#10B981",fontSize:11,fontWeight:700,marginBottom:8}}>🤝 合作主播汇总</div>
+        <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+          <div><div style={{color:"#475569",fontSize:10}}>UV合计</div><div style={{color:"#6366F1",fontWeight:800,fontSize:18}}>{coopUV>0?coopUV.toLocaleString():"--"}</div></div>
+          <div><div style={{color:"#475569",fontSize:10}}>开播（≥1h）</div><div style={{color:"#10B981",fontWeight:800,fontSize:18}}>{coopLive}<span style={{color:"#334155",fontSize:12}}>/{ coopStrs.length}</span></div></div>
+          <div><div style={{color:"#475569",fontSize:10}}>总时长</div><div style={{color:"#F59E0B",fontWeight:800,fontSize:18}}>{coopHours>0?coopHours.toFixed(1):"--"}<span style={{color:"#334155",fontSize:12}}>h</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    {/* Sub tabs + save */}
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+      <div style={{display:"flex",gap:2,padding:"3px",background:"#0f172a",borderRadius:8,border:"1px solid #1e293b"}}>
+        <button onClick={()=>setSubTab("guild")} style={{padding:"5px 16px",borderRadius:6,border:"none",background:subTab==="guild"?"#6366F1":"transparent",color:subTab==="guild"?"#fff":"#64748B",cursor:"pointer",fontSize:12,fontWeight:subTab==="guild"?700:400,fontFamily:"'Noto Sans SC',sans-serif"}}>🏛️ 在会主播 ({guildStrs.length})</button>
+        <button onClick={()=>setSubTab("coop")} style={{padding:"5px 16px",borderRadius:6,border:"none",background:subTab==="coop"?"#10B981":"transparent",color:subTab==="coop"?"#fff":"#64748B",cursor:"pointer",fontSize:12,fontWeight:subTab==="coop"?700:400,fontFamily:"'Noto Sans SC',sans-serif"}}>🤝 合作主播 ({coopStrs.length})</button>
+      </div>
       <div style={{flex:1}}/>
-      <button onClick={save2} disabled={saving} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 18px",background:saved?"#10B981":"#6366F1",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"'Noto Sans SC',sans-serif"}}><Ic n={saved?"check":"save"} s={13}/>{saving?"保存中...":saved?"已保存！":"保存本周复盘"}</button>
+      <button onClick={save2} disabled={saving} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 18px",background:saved?"#10B981":"#6366F1",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"'Noto Sans SC',sans-serif"}}>{saving?"保存中...":saved?"✓ 已保存！":"💾 保存本周复盘"}</button>
     </div>
-    <div style={{overflowX:"auto",borderRadius:11,border:"1px solid #1e293b"}}>
-      <table style={{borderCollapse:"collapse",minWidth:1820,width:"100%"}}>
-        <thead>
-          <tr><th style={TH("#060e1c","#475569",{width:28})}>#</th><th style={TH("#060e1c","#94a3b8",{width:90})}>昵称</th><th style={TH("#060e1c","#64748B",{width:98})}>抖音ID</th><th colSpan={DATA_FIELDS.length} style={TH(CD+"22",CD,{borderLeft:`2px solid ${CD}`})}>📊 核心数据</th><th colSpan={CONTENT_FIELDS.length} style={TH(CC+"22",CC,{borderLeft:`2px solid ${CC}`})}>🎙️ 内容复盘</th><th colSpan={CONCLUDE_FIELDS.length} style={TH(CR+"22",CR,{borderLeft:`2px solid ${CR}`})}>🔍 结论 & 计划</th><th style={TH("#ef444422","#ef4444",{minWidth:58})}>评级</th></tr>
-          <tr><th colSpan={3} style={TH("#040c18")}></th>{DATA_FIELDS.map((f,i)=>(<th key={f.key} style={TH(CD+"0d","#93C5FD",{borderLeft:i===0?`2px solid ${CD}44`:undefined,minWidth:f.w})}>{f.short}</th>))}{CONTENT_FIELDS.map((f,i)=>(<th key={f.key} style={TH(CC+"0d","#6EE7B7",{borderLeft:i===0?`2px solid ${CC}44`:undefined,minWidth:f.w})}>{f.label}</th>))}{CONCLUDE_FIELDS.map((f,i)=>(<th key={f.key} style={TH(CR+"0d","#C4B5FD",{borderLeft:i===0?`2px solid ${CR}44`:undefined,minWidth:f.w})}>{f.label}</th>))}<th style={TH("#ef44440d","#FCA5A5")}></th></tr>
-        </thead>
-        <tbody>
-          {grouped.map(({group,members})=>{const gc=GROUP_COLORS[group]||"#6366F1";return members.map((s,mi)=>{const rec=data[s.id]||EMPTY_REC();const bg=mi%2===0?"#080f1e":"#0a1628";const cell=(ex={})=>TD(bg,ex);const live=isLiveEnough(rec.liveDuration);const ta=(field,ph,isText=false)=>(<textarea value={rec[field]} onChange={e=>upd(s.id,field,e.target.value)} placeholder={ph} rows={isText?2:1} style={{width:"100%",background:"transparent",border:"none",color:"#e2e8f0",fontSize:11,resize:"none",outline:"none",lineHeight:1.4,fontFamily:"'Noto Sans SC',sans-serif",boxSizing:"border-box"}}/>);return(<tr key={s.id}>{mi===0&&(<td rowSpan={members.length} style={{background:gc,color:"#fff",fontWeight:800,fontSize:11,textAlign:"center",writingMode:"vertical-rl",padding:"10px 5px",border:"1px solid #1e293b",letterSpacing:2}}>{group}</td>)}<td style={cell({fontWeight:700,color:"#f1f5f9",fontSize:11,whiteSpace:"nowrap"})}>{mi+1}. {s.name}</td><td style={cell({color:"#475569",fontSize:10})}>{s.tid}</td>{DATA_FIELDS.map((f,i)=>(<td key={f.key} style={cell({borderLeft:i===0?`2px solid ${CD}44`:undefined})}><div>{ta(f.key,f.ph)}{f.key==="liveDuration"&&live&&<div style={{color:"#10B981",fontSize:9,fontWeight:700}}>✓开播</div>}</div></td>))}{CONTENT_FIELDS.map((f,i)=>(<td key={f.key} style={cell({borderLeft:i===0?`2px solid ${CC}44`:undefined,verticalAlign:"top",padding:"5px 7px"})}>{ta(f.key,f.ph,true)}</td>))}{CONCLUDE_FIELDS.map((f,i)=>(<td key={f.key} style={cell({borderLeft:i===0?`2px solid ${CR}44`:undefined,verticalAlign:"top",padding:"5px 7px"})}>{ta(f.key,f.ph,true)}</td>))}<td style={cell({padding:"5px 4px"})}><select value={rec.rating} onChange={e=>upd(s.id,"rating",e.target.value)} style={{width:"100%",background:rec.rating?RATING_COLORS[rec.rating]:"#1e293b",border:"1px solid #334155",borderRadius:6,color:"#fff",padding:"3px 4px",fontSize:11,cursor:"pointer",fontWeight:700,fontFamily:"'Noto Sans SC',sans-serif"}}><option value="">-</option>{RATING_OPTIONS.map(r=><option key={r} value={r}>{r}</option>)}</select></td></tr>);});})}
-        </tbody>
-      </table>
-    </div>
+
+    {/* 在会主播 table */}
+    {subTab==="guild"&&(<div>
+      {guildStrs.length===0?(<div style={{textAlign:"center",padding:"40px 0",color:"#334155"}}><div style={{fontSize:32,marginBottom:8}}>🎮</div><div style={{fontSize:13,color:"#475569"}}>当前运营暂无在会主播</div></div>):(<div style={{overflowX:"auto",borderRadius:11,border:"1px solid #1e293b"}}>
+        <table style={{borderCollapse:"collapse",minWidth:1600,width:"100%"}}>
+          <thead>
+            <tr>
+              <th style={TH("#060e1c","#475569",{width:28})}>#</th>
+              <th style={TH("#060e1c","#94a3b8",{width:90})}>昵称</th>
+              <th style={TH("#060e1c","#64748B",{width:95})}>抖音ID</th>
+              <th colSpan={GUILD_FIELDS.length} style={TH(CD+"22",CD,{borderLeft:"2px solid "+CD})}>📊 核心数据</th>
+              <th colSpan={CONTENT_FIELDS.length} style={TH(CC+"22",CC,{borderLeft:"2px solid "+CC})}>🎙️ 内容复盘</th>
+              <th colSpan={CONCLUDE_FIELDS.length} style={TH(CR+"22",CR,{borderLeft:"2px solid "+CR})}>🔍 结论 & 计划</th>
+              <th style={TH("#ef444422","#ef4444",{minWidth:58})}>评级</th>
+            </tr>
+            <tr>
+              <th colSpan={3} style={TH("#040c18")}></th>
+              {GUILD_FIELDS.map((f,i)=>(<th key={f.key} style={TH(CD+"0d","#93C5FD",{borderLeft:i===0?"2px solid "+CD+"44":undefined,minWidth:f.w})}>{f.short}</th>))}
+              {CONTENT_FIELDS.map((f,i)=>(<th key={f.key} style={TH(CC+"0d","#6EE7B7",{borderLeft:i===0?"2px solid "+CC+"44":undefined,minWidth:f.w})}>{f.label}</th>))}
+              {CONCLUDE_FIELDS.map((f,i)=>(<th key={f.key} style={TH(CR+"0d","#C4B5FD",{borderLeft:i===0?"2px solid "+CR+"44":undefined,minWidth:f.w})}>{f.label}</th>))}
+              <th style={TH("#ef44440d","#FCA5A5")}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {grouped.map(({group,members})=>{const gc=GROUP_COLORS[group]||"#6366F1";return members.map((s,mi)=>{
+              const rec=data[s.id]||EMPTY_REC();const bg=mi%2===0?"#080f1e":"#0a1628";const cell=(ex={})=>TD(bg,ex);
+              const live=isLiveEnough(rec.liveDuration);
+              const ta=(field,ph,isText=false)=>(<textarea value={rec[field]} onChange={e=>upd(s.id,field,e.target.value)} placeholder={ph} rows={isText?2:1} style={{width:"100%",background:"transparent",border:"none",color:"#e2e8f0",fontSize:11,resize:"none",outline:"none",lineHeight:1.4,fontFamily:"'Noto Sans SC',sans-serif",boxSizing:"border-box"}}/>);
+              return(<tr key={s.id}>
+                {mi===0&&(<td rowSpan={members.length} style={{background:gc,color:"#fff",fontWeight:800,fontSize:11,textAlign:"center",writingMode:"vertical-rl",padding:"10px 5px",border:"1px solid #1e293b",letterSpacing:2}}>{group}</td>)}
+                <td style={cell({fontWeight:700,color:"#f1f5f9",fontSize:11,whiteSpace:"nowrap"})}>{mi+1}. {s.name}</td>
+                <td style={cell({color:"#475569",fontSize:10})}>{s.tid}</td>
+                {GUILD_FIELDS.map((f,i)=>(<td key={f.key} style={cell({borderLeft:i===0?"2px solid "+CD+"44":undefined})}>
+                  <div>{ta(f.key,f.ph)}{f.key==="liveDuration"&&live&&<div style={{color:"#10B981",fontSize:9,fontWeight:700}}>✓开播</div>}</div>
+                </td>))}
+                {CONTENT_FIELDS.map((f,i)=>(<td key={f.key} style={cell({borderLeft:i===0?"2px solid "+CC+"44":undefined,verticalAlign:"top",padding:"5px 7px"})}>{ta(f.key,f.ph,true)}</td>))}
+                {CONCLUDE_FIELDS.map((f,i)=>(<td key={f.key} style={cell({borderLeft:i===0?"2px solid "+CR+"44":undefined,verticalAlign:"top",padding:"5px 7px"})}>{ta(f.key,f.ph,true)}</td>))}
+                <td style={cell({padding:"5px 4px"})}>
+                  <select value={rec.rating} onChange={e=>upd(s.id,"rating",e.target.value)} style={{width:"100%",background:rec.rating?RATING_COLORS[rec.rating]:"#1e293b",border:"1px solid #334155",borderRadius:6,color:"#fff",padding:"3px 4px",fontSize:11,cursor:"pointer",fontWeight:700,fontFamily:"'Noto Sans SC',sans-serif"}}>
+                    <option value="">-</option>{RATING_OPTIONS.map(r=><option key={r} value={r}>{r}</option>)}
+                  </select>
+                </td>
+              </tr>);
+            });})}
+          </tbody>
+        </table>
+      </div>)}
+    </div>)}
+
+    {/* 合作主播 table - simplified */}
+    {subTab==="coop"&&(<div>
+      {coopStrs.length===0?(<div style={{textAlign:"center",padding:"40px 0",color:"#334155"}}><div style={{fontSize:32,marginBottom:8}}>🤝</div><div style={{fontSize:13,color:"#475569"}}>当前运营暂无合作主播</div></div>):(<div style={{overflowX:"auto",borderRadius:11,border:"1px solid #1e293b"}}>
+        <table style={{borderCollapse:"collapse",minWidth:700,width:"100%"}}>
+          <thead>
+            <tr>
+              <th style={TH("#060e1c","#475569",{width:28})}>#</th>
+              <th style={TH("#060e1c","#94a3b8",{width:100})}>昵称</th>
+              <th style={TH("#060e1c","#64748B",{width:110})}>抖音ID</th>
+              {COOP_FIELDS.map((f,i)=>(<th key={f.key} style={TH("#10B98122","#6EE7B7",{minWidth:f.w,borderLeft:i===0?"2px solid #10B981":undefined})}>{f.short}</th>))}
+              <th style={TH("#8B5CF622","#C4B5FD",{minWidth:200})}>备注</th>
+              <th style={TH("#ef444422","#ef4444",{minWidth:58})}>评级</th>
+            </tr>
+          </thead>
+          <tbody>
+            {coopStrs.map((s,i)=>{
+              const rec=data[s.id]||EMPTY_REC();const bg=i%2===0?"#080f1e":"#0a1628";const cell=(ex={})=>TD(bg,ex);
+              const live=isLiveEnough(rec.liveDuration);
+              const ta=(field,ph)=>(<textarea value={rec[field]} onChange={e=>upd(s.id,field,e.target.value)} placeholder={ph} rows={1} style={{width:"100%",background:"transparent",border:"none",color:"#e2e8f0",fontSize:11,resize:"none",outline:"none",lineHeight:1.4,fontFamily:"'Noto Sans SC',sans-serif",boxSizing:"border-box"}}/>);
+              return(<tr key={s.id}>
+                <td style={cell({color:"#475569",fontSize:11,textAlign:"center"})}>{i+1}</td>
+                <td style={cell({fontWeight:700,color:"#f1f5f9",fontSize:11,whiteSpace:"nowrap"})}>{s.name}</td>
+                <td style={cell({color:"#475569",fontSize:10})}>{s.tid}</td>
+                {COOP_FIELDS.map((f,idx2)=>(<td key={f.key} style={cell({borderLeft:idx2===0?"2px solid #10B98144":undefined})}>
+                  <div>{ta(f.key,f.ph)}{f.key==="liveDuration"&&live&&<div style={{color:"#10B981",fontSize:9,fontWeight:700}}>✓开播</div>}</div>
+                </td>))}
+                <td style={cell({verticalAlign:"top",padding:"5px 7px"})}>{ta("highlight","数据说明/特殊情况...")}</td>
+                <td style={cell({padding:"5px 4px"})}>
+                  <select value={rec.rating} onChange={e=>upd(s.id,"rating",e.target.value)} style={{width:"100%",background:rec.rating?RATING_COLORS[rec.rating]:"#1e293b",border:"1px solid #334155",borderRadius:6,color:"#fff",padding:"3px 4px",fontSize:11,cursor:"pointer",fontWeight:700,fontFamily:"'Noto Sans SC',sans-serif"}}>
+                    <option value="">-</option>{RATING_OPTIONS.map(r=><option key={r} value={r}>{r}</option>)}
+                  </select>
+                </td>
+              </tr>);
+            })}
+          </tbody>
+        </table>
+      </div>)}
+    </div>)}
   </div>);
 }
+
 
 function MonthlyView({operators,streamers,allWeeks,currentOpId}){
   const myS=streamers.filter(s=>s.opId===currentOpId&&!s.deleted&&!s.deleteRequested);const curOp=operators.find(o=>o.id===currentOpId);
