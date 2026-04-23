@@ -251,14 +251,244 @@ function AdminLoginModal({onSuccess,onClose}){
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div style={{background:"#0f172a",border:"1px solid #334155",borderRadius:16,padding:32,width:320,textAlign:"center"}}><div style={{fontSize:36,marginBottom:12}}>🔐</div><div style={{color:"#f1f5f9",fontWeight:800,fontSize:16,marginBottom:6}}>管理员验证</div><div style={{color:"#64748B",fontSize:13,marginBottom:20}}>输入管理员密码进入审批模式</div><input type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&check()} placeholder="输入密码" style={{width:"100%",background:err?"#2D1515":"#1e293b",border:"1px solid "+(err?"#EF4444":"#334155"),borderRadius:8,color:"#f1f5f9",padding:"10px 14px",fontSize:14,outline:"none",fontFamily:"'Noto Sans SC',sans-serif",boxSizing:"border-box",marginBottom:8}}/>{err&&<div style={{color:"#EF4444",fontSize:12,marginBottom:8}}>密码错误</div>}<button onClick={check} style={{width:"100%",padding:"10px",background:"#6366F1",border:"none",borderRadius:8,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"'Noto Sans SC',sans-serif"}}>确认</button></div></div>);
 }
 
-function ImportModal({operators,currentOpId,onImport,onClose}){
-  const[mode,setMode]=useState("info");const[rows,setRows]=useState([]);const[opId,setOpId]=useState(currentOpId||operators[0]?.id||"");const[msg,setMsg]=useState("");
-  const downloadTemplate=()=>{const headers=["主播昵称","抖音ID","手机尾号","实名姓名","分组(合作/公会/重点跟播)","签约日期(YYYY-MM-DD)","首播日期(YYYY-MM-DD)","开播时长(小时)","曝光","UV(场观)","ACU","峰值在线","停留时长(s)","互动率%","粉丝净增","话术要点","BGM节奏","热点追踪","活动执行","本周亮点","待解决问题","下周方向","评级(S/A+/A/B+/B/C+/C/D)"];const ex=["示例主播","example123","1234","张三","公会","2024-01-01","2024-01-15","3.5","10000","5000","200","500","45","5.2","100","开场话术好用","节奏快","追了XX热点","活动配合好","互动率高","话术需改进","加强开场钩子","A"];const csv=[headers,ex].map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="三冰复盘导入模板.csv";a.click();URL.revokeObjectURL(url);};
-  const parseCSV=text=>{const lines=text.trim().split("\n");const headers=lines[0].split(",").map(h=>h.replace(/"/g,"").trim());return lines.slice(1).map(line=>{const vals=[];let cur="";let inQ=false;for(let ch of line){if(ch==='"'){inQ=!inQ;}else if(ch===","&&!inQ){vals.push(cur.trim());cur="";}else{cur+=ch;}}vals.push(cur.trim());const obj={};headers.forEach((h,i)=>{obj[h]=vals[i]||"";});return obj;}).filter(r=>r["主播昵称"]);};
-  const handleFile=async e=>{const file=e.target.files[0];if(!file)return;const text=await file.text();try{const parsed=parseCSV(text);const mapped=parsed.map((r,i)=>({id:"import_"+Date.now()+"_"+i,name:r["主播昵称"]||"",tid:r["抖音ID"]||"",phone:r["手机尾号"]||"",realname:r["实名姓名"]||"",operator:operators.find(o=>o.id===opId)?.name||"",opId,group:r["分组(合作/公会/重点跟播)"]||"公会",deleted:false,signDate:r["签约日期(YYYY-MM-DD)"]||"",firstLiveDate:r["首播日期(YYYY-MM-DD)"]||"",_weekData:{liveDuration:r["开播时长(小时)"]||"",exposure:r["曝光"]||"",uv:r["UV(场观)"]||"",acu:r["ACU"]||"",peak:r["峰值在线"]||"",stay:r["停留时长(s)"]||"",interact:r["互动率%"]||"",fans:r["粉丝净增"]||"",script:r["话术要点"]||"",bgm:r["BGM节奏"]||"",hotspot:r["热点追踪"]||"",activity:r["活动执行"]||"",highlight:r["本周亮点"]||"",problem:r["待解决问题"]||"",nextplan:r["下周方向"]||"",rating:r["评级(S/A+/A/B+/B/C+/C/D)"]||""}}));setRows(mapped);setMode("preview");setMsg(`解析成功，共 ${mapped.length} 条`);}catch{setMsg("解析失败，请确认文件格式");}};
+function ImportModal({operators,currentOpId,onImport,onClose,streamers,selectedWeek,onWeekSelect}){
+  const[mode,setMode]=useState("upload"); // upload | preview | confirm
+  const[opId,setOpId]=useState(currentOpId||operators[0]?.id||"");
+  const[msg,setMsg]=useState("");
+  const[parsedWeeks,setParsedWeeks]=useState({}); // {weekLabel: [{tid,name,uv,acu,peak,liveDuration,stay}]}
+  const[selectedParsedWeek,setSelectedParsedWeek]=useState("");
+  const[matchResults,setMatchResults]=useState([]); // [{streamer, data, matched}]
+  const[importType,setImportType]=useState("guild"); // guild | coop
+
+  // Parse duration string "X小时X分钟X秒" or number -> hours
+  const parseDuration=val=>{
+    if(!val&&val!==0)return"";
+    if(typeof val==="number")return String(Math.round(val*100)/100);
+    const s=String(val).trim();
+    const h=s.match(/(\d+)小时/);const m=s.match(/(\d+)分钟/);
+    const hours=(h?parseInt(h[1]):0)+(m?parseInt(m[1]):0)/60;
+    return hours>0?String(Math.round(hours*100)/100):"";
+  };
+
+  // Normalize date range to system format "M.DD - M.DD"
+  const normalizeDate=raw=>{
+    if(!raw)return null;const s=String(raw).trim();
+    // "4月13日-4月19日"
+    let m=s.match(/(\d+)月(\d+)日[-–](\d+)月(\d+)日/);
+    if(m)return `${parseInt(m[1])}.${m[2].padStart(2,"0")} - ${parseInt(m[3])}.${m[4].padStart(2,"0")}`;
+    // "12.1-12.7"
+    m=s.match(/(\d+)\.(\d+)[-–](\d+)\.(\d+)/);
+    if(m)return `${parseInt(m[1])}.${m[2].padStart(2,"0")} - ${parseInt(m[3])}.${m[4].padStart(2,"0")}`;
+    return null;
+  };
+
+  const handleFile=async e=>{
+    const file=e.target.files[0];if(!file)return;
+    setMsg("解析中...");
+    try{
+      const buf=await file.arrayBuffer();
+      // Use SheetJS to read Excel
+      const XLSX=window.XLSX;
+      if(!XLSX){setMsg("加载Excel解析库中，请稍候再试...");return;}
+      const wb=XLSX.read(buf,{type:"array"});
+      
+      // Try to find the data sheet (表3 or similar)
+      const sheetName=wb.SheetNames.find(n=>n.includes("表3")||n.includes("开播数据")||n.includes("数据"))||wb.SheetNames[0];
+      const ws=wb.Sheets[sheetName];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+      
+      // Parse week blocks
+      const weeks={};
+      let currentWeek=null;
+      
+      for(let i=0;i<rows.length;i++){
+        const row=rows[i];
+        if(!row||row.every(v=>v===null))continue;
+        
+        const col0=row[0];const col1=row[1];
+        
+        // Check if this is a week header (col0 has date, col2/3 empty or is sequence header)
+        if(col0!==null&&col0!=="序列"){
+          const nd=normalizeDate(String(col0));
+          if(nd){currentWeek=nd;weeks[currentWeek]=[];continue;}
+          // Also handle "三冰线上主播-X.X-X.X" format
+          const m=String(col0).match(/[\d.月日年-]+/);
+          if(m&&String(col0).includes("三冰")){
+            const nd2=normalizeDate(String(col0).replace(/三冰线上主播[-\s]*/,"").replace(/在会主播[\d月日\s]*/,""));
+            if(nd2){currentWeek=nd2;weeks[currentWeek]=[];continue;}
+          }
+        }
+        
+        // Check if this is a data row (col1 has date matching current week, and has tid in col3)
+        if(currentWeek&&col1!==null&&col0!=="序列"){
+          const rowDate=normalizeDate(String(col1));
+          if(rowDate){
+            const tid=row[3]!==null?String(row[3]).trim():"";
+            const name=row[2]!==null?String(row[2]).trim():"";
+            if(tid&&name&&name!=="抖音昵称"){
+              weeks[currentWeek].push({
+                tid,name,
+                uv:row[4]!==null?String(row[4]):"",
+                acu:row[5]!==null?String(row[5]):"",
+                peak:row[6]!==null?String(row[6]):"",
+                liveDuration:parseDuration(row[7]),
+                stay:row[8]!==null?String(row[8]):"",
+              });
+            }
+          }
+        }
+      }
+      
+      const weekKeys=Object.keys(weeks).filter(w=>weeks[w].length>0);
+      if(weekKeys.length===0){
+        // Try CSV format (合作主播 simple table)
+        // Headers: 主播昵称, 抖音ID, 场观, acu, 直播时长h, 备注
+        const coopRows=rows.filter(r=>r&&r[0]&&r[0]!=="主播昵称"&&r[0]!=="合计");
+        if(coopRows.length>0){
+          const weekLabel=selectedWeek||"当前周";
+          weeks[weekLabel]=coopRows.map(r=>({
+            name:String(r[0]||"").trim(),
+            tid:String(r[1]||"").trim(),
+            uv:String(r[2]||""),acu:String(r[3]||""),
+            liveDuration:parseDuration(r[4]),
+            highlight:String(r[5]||""),
+          })).filter(r=>r.name);
+          setImportType("coop");
+        }
+      }
+      
+      setParsedWeeks(weeks);
+      const latest=weekKeys[weekKeys.length-1]||"";
+      setSelectedParsedWeek(latest);
+      setMode("select");
+      setMsg(`识别到 ${weekKeys.length} 个周期数据`);
+    }catch(err){
+      setMsg("解析失败："+err.message);
+    }
+  };
+
+  const handleConfirmWeek=()=>{
+    if(!selectedParsedWeek||!parsedWeeks[selectedParsedWeek])return;
+    const rows=parsedWeeks[selectedParsedWeek];
+    // Match against system streamers by tid then name
+    const results=rows.map(r=>{
+      const matched=streamers.find(s=>
+        (r.tid&&String(s.tid).trim()===String(r.tid).trim())||
+        (r.name&&s.name.includes(r.name.slice(0,4)))
+      );
+      return{...r,matched,streamerName:matched?.name||r.name};
+    });
+    setMatchResults(results);
+    setMode("preview");
+  };
+
+  const handleDoImport=async()=>{
+    const weekLabel=selectedParsedWeek;
+    if(onWeekSelect)await onWeekSelect(weekLabel);
+    const records={};
+    matchResults.forEach(r=>{
+      if(r.matched){
+        records[r.matched.id]={
+          uv:r.uv||"",acu:r.acu||"",peak:r.peak||"",
+          liveDuration:r.liveDuration||"",stay:r.stay||"",
+          highlight:r.highlight||"",
+          exposure:"",interact:"",fans:"",
+          script:"",bgm:"",hotspot:"",activity:"",problem:"",nextplan:"",rating:""
+        };
+      }
+    });
+    const weekKey=`wr_${opId}_${weekLabel.replace(/[\s.\-]/g,"_")}`;
+    const existing=await dbGet(weekKey)||{records:{},teamNote:{good:"",issue:""}};
+    const merged={...existing,records:{...existing.records,...records}};
+    await dbSet(weekKey,merged);
+    setMsg("导入成功！");
+    setTimeout(()=>onClose(),800);
+  };
+
   const btn=(bg,ex={})=>({padding:"8px 18px",background:bg,border:"none",borderRadius:8,color:"#fff",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'Noto Sans SC',sans-serif",display:"flex",alignItems:"center",gap:6,...ex});
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:16,width:"min(680px,94vw)",maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden"}}><div style={{padding:"18px 22px",borderBottom:"1px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}><span style={{color:"#f1f5f9",fontWeight:800,fontSize:15}}>📥 批量导入主播数据</span><button onClick={onClose} style={{background:"none",border:"none",color:"#475569",cursor:"pointer"}}><Ic n="x" s={19}/></button></div><div style={{overflowY:"auto",padding:22,flex:1}}>{mode!=="preview"&&(<><div style={{marginBottom:16}}><div style={{color:"#94a3b8",fontSize:13,marginBottom:8}}>归属运营</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{operators.map(op=>(<button key={op.id} onClick={()=>setOpId(op.id)} style={{...btn(opId===op.id?op.color:"#1e293b"),border:"1px solid "+(opId===op.id?op.color:"#334155")}}>{op.name}</button>))}</div></div><div style={{background:"#080f1e",borderRadius:12,padding:18,marginBottom:14,border:"1px solid #1e293b"}}><div style={{color:"#6366F1",fontWeight:700,fontSize:13,marginBottom:6}}>第一步：下载模板</div><button onClick={downloadTemplate} style={btn("#334155")}><Ic n="download" s={14}/>下载 CSV 模板</button></div><div style={{background:"#080f1e",borderRadius:12,padding:18,border:"1px solid #1e293b"}}><div style={{color:"#10B981",fontWeight:700,fontSize:13,marginBottom:6}}>第二步：上传填好的文件</div><label style={{...btn("#10B981"),display:"inline-flex",cursor:"pointer"}}><Ic n="upload" s={14}/>选择文件上传<input type="file" accept=".csv" onChange={handleFile} style={{display:"none"}}/></label>{msg&&<div style={{color:msg.includes("失败")?"#EF4444":"#10B981",fontSize:13,marginTop:10}}>{msg}</div>}</div></>)}{mode==="preview"&&(<><div style={{color:"#10B981",fontSize:13,marginBottom:12,fontWeight:700}}>{msg}</div><div style={{overflowX:"auto",borderRadius:10,border:"1px solid #1e293b",marginBottom:14}}><table style={{borderCollapse:"collapse",width:"100%",minWidth:500}}><thead><tr>{["昵称","抖音ID","签约","首播","开播h","UV","评级"].map(h=>(<th key={h} style={{padding:"8px 10px",background:"#1e293b",color:"#64748B",fontSize:11,fontWeight:700,textAlign:"left",borderBottom:"1px solid #334155"}}>{h}</th>))}</tr></thead><tbody>{rows.map((r,i)=>(<tr key={i}>{[r.name,r.tid,r.signDate,r.firstLiveDate,r._weekData.liveDuration,r._weekData.uv,r._weekData.rating].map((v,vi)=>(<td key={vi} style={{padding:"7px 10px",background:i%2===0?"#080f1e":"#0a1628",color:"#e2e8f0",fontSize:12,border:"1px solid #0d1929"}}>{v||"-"}</td>))}</tr>))}</tbody></table></div></>)}</div><div style={{padding:"14px 22px",borderTop:"1px solid #1e293b",display:"flex",justifyContent:"space-between",gap:8,flexShrink:0}}>{mode==="preview"?(<><button onClick={()=>{setMode("info");setRows([]);setMsg("");}} style={btn("#334155")}>重新上传</button><button onClick={()=>{onImport(rows,opId);onClose();}} style={btn("#6366F1")}><Ic n="check" s={14}/>确认导入 {rows.length} 条</button></>):(<><div/><button onClick={onClose} style={btn("#334155")}>取消</button></>)}</div></div></div>);
+  const matchedCount=matchResults.filter(r=>r.matched).length;
+
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:16,width:"min(780px,96vw)",maxHeight:"88vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{padding:"18px 22px",borderBottom:"1px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+        <span style={{color:"#f1f5f9",fontWeight:800,fontSize:15}}>📥 智能导入数据</span>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#475569",cursor:"pointer",fontSize:20}}>✕</button>
+      </div>
+
+      <div style={{overflowY:"auto",padding:22,flex:1}}>
+        {/* Step 1: Upload */}
+        {(mode==="upload"||mode==="select")&&(<>
+          <div style={{background:"#080f1e",borderRadius:12,padding:18,marginBottom:14,border:"1px solid #1e293b"}}>
+            <div style={{color:"#6366F1",fontWeight:700,fontSize:13,marginBottom:6}}>📊 支持的格式</div>
+            <div style={{color:"#64748B",fontSize:12,lineHeight:1.8}}>
+              ✅ 在会主播数据表（Excel，含「抖音ID、UV、ACU、PCU、时长」列）<br/>
+              ✅ 合作主播数据表（Excel/CSV，含「主播昵称、场观、ACU、直播时长h」列）<br/>
+              ✅ 系统自动识别日期、匹配主播、解析时长格式
+            </div>
+          </div>
+          <div style={{marginBottom:16}}>
+            <div style={{color:"#94a3b8",fontSize:13,marginBottom:8}}>数据归属运营</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{operators.map(op=>(<button key={op.id} onClick={()=>setOpId(op.id)} style={{...btn(opId===op.id?op.color:"#1e293b"),border:"1px solid "+(opId===op.id?op.color:"#334155")}}>{op.name}</button>))}</div>
+          </div>
+          <label style={{...btn("#6366F1"),display:"inline-flex",cursor:"pointer",marginBottom:12}}>
+            📂 选择Excel/CSV文件上传
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{display:"none"}}/>
+          </label>
+          {msg&&<div style={{color:msg.includes("失败")?"#EF4444":"#10B981",fontSize:13,marginBottom:12,fontWeight:700}}>{msg}</div>}
+        </>)}
+
+        {/* Step 2: Select week */}
+        {mode==="select"&&Object.keys(parsedWeeks).length>0&&(<>
+          <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14,marginBottom:10}}>识别到以下周期，请选择要导入的：</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
+            {Object.entries(parsedWeeks).filter(([w,rows])=>rows.length>0).map(([w,rows])=>(
+              <button key={w} onClick={()=>setSelectedParsedWeek(w)} style={{padding:"10px 16px",background:selectedParsedWeek===w?"#6366F1":"#1e293b",border:"1px solid "+(selectedParsedWeek===w?"#6366F1":"#334155"),borderRadius:8,color:"#f1f5f9",cursor:"pointer",textAlign:"left",fontFamily:"'Noto Sans SC',sans-serif"}}>
+                <span style={{fontWeight:700}}>{w}</span>
+                <span style={{color:"#64748B",fontSize:12,marginLeft:12}}>{rows.length} 条主播数据</span>
+              </button>
+            ))}
+          </div>
+        </>)}
+
+        {/* Step 3: Preview match results */}
+        {mode==="preview"&&(<>
+          <div style={{display:"flex",gap:12,marginBottom:14,flexWrap:"wrap"}}>
+            <div style={{background:"#10B98122",border:"1px solid #10B98144",borderRadius:8,padding:"8px 16px",color:"#10B981",fontWeight:700}}>✓ 匹配成功 {matchedCount} 人</div>
+            <div style={{background:"#EF444422",border:"1px solid #EF444444",borderRadius:8,padding:"8px 16px",color:"#EF4444",fontWeight:700}}>✗ 未匹配 {matchResults.length-matchedCount} 人</div>
+          </div>
+          <div style={{overflowX:"auto",borderRadius:10,border:"1px solid #1e293b",marginBottom:14}}>
+            <table style={{borderCollapse:"collapse",width:"100%",minWidth:600}}>
+              <thead><tr>{["状态","Excel昵称","匹配主播","UV","ACU","PCU","开播时长h"].map(h=>(<th key={h} style={{padding:"8px 10px",background:"#1e293b",color:"#64748B",fontSize:11,fontWeight:700,textAlign:"left",borderBottom:"1px solid #334155"}}>{h}</th>))}</tr></thead>
+              <tbody>{matchResults.map((r,i)=>(<tr key={i}>
+                <td style={{padding:"7px 10px",background:i%2===0?"#080f1e":"#0a1628",border:"1px solid #0d1929",fontSize:12}}>{r.matched?<span style={{color:"#10B981",fontWeight:700}}>✓</span>:<span style={{color:"#EF4444"}}>✗</span>}</td>
+                <td style={{padding:"7px 10px",background:i%2===0?"#080f1e":"#0a1628",color:"#94a3b8",fontSize:11,border:"1px solid #0d1929"}}>{r.name}</td>
+                <td style={{padding:"7px 10px",background:i%2===0?"#080f1e":"#0a1628",color:r.matched?"#f1f5f9":"#334155",fontWeight:r.matched?700:400,fontSize:12,border:"1px solid #0d1929"}}>{r.matched?r.matched.name:"未找到"}</td>
+                <td style={{padding:"7px 10px",background:i%2===0?"#080f1e":"#0a1628",color:"#6366F1",fontSize:12,border:"1px solid #0d1929"}}>{r.uv||"-"}</td>
+                <td style={{padding:"7px 10px",background:i%2===0?"#080f1e":"#0a1628",color:"#94a3b8",fontSize:12,border:"1px solid #0d1929"}}>{r.acu||"-"}</td>
+                <td style={{padding:"7px 10px",background:i%2===0?"#080f1e":"#0a1628",color:"#94a3b8",fontSize:12,border:"1px solid #0d1929"}}>{r.peak||"-"}</td>
+                <td style={{padding:"7px 10px",background:i%2===0?"#080f1e":"#0a1628",color:"#F59E0B",fontSize:12,border:"1px solid #0d1929"}}>{r.liveDuration||"-"}</td>
+              </tr>))}</tbody>
+            </table>
+          </div>
+          {matchResults.length-matchedCount>0&&<div style={{color:"#F59E0B",fontSize:12,marginBottom:8}}>⚠️ 未匹配的主播可能是昵称或ID有变化，可导入后手动补填</div>}
+        </>)}
+      </div>
+
+      <div style={{padding:"14px 22px",borderTop:"1px solid #1e293b",display:"flex",justifyContent:"space-between",gap:8,flexShrink:0}}>
+        {mode==="upload"&&<><div/><button onClick={onClose} style={btn("#334155")}>取消</button></>}
+        {mode==="select"&&(<>
+          <button onClick={()=>{setMode("upload");setMsg("");}} style={btn("#334155")}>重新上传</button>
+          <button onClick={handleConfirmWeek} disabled={!selectedParsedWeek} style={btn("#6366F1")}>下一步：预览匹配结果 →</button>
+        </>)}
+        {mode==="preview"&&(<>
+          <button onClick={()=>setMode("select")} style={btn("#334155")}>← 返回</button>
+          <button onClick={handleDoImport} disabled={matchedCount===0} style={btn("#10B981")}>✓ 确认导入 {matchedCount} 条数据</button>
+        </>)}
+      </div>
+    </div>
+  </div>);
 }
+
 
 function ManageModal({operators,streamers,isAdmin,onClose,onSave}){
   const[ops,setOps]=useState(JSON.parse(JSON.stringify(operators)));const[strs,setStrs]=useState(JSON.parse(JSON.stringify(streamers)));const[tab,setTab]=useState("ops");
@@ -524,6 +754,13 @@ function MonthlyView({operators,streamers,allWeeks,currentOpId}){
   </div>);
 }
 
+// Load SheetJS for Excel parsing
+if(typeof window!=="undefined"&&!window.XLSX){
+  const s=document.createElement("script");
+  s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  document.head.appendChild(s);
+}
+
 export default function App(){
   const[operators,setOperators]=useState(DEFAULT_OPERATORS);const[streamers,setStreamers]=useState([]);const[currentOpId,setCurrentOpId]=useState(DEFAULT_OPERATORS[0].id);
   const[tab,setTab]=useState("dashboard");const[selectedWeek,setSelectedWeek]=useState("");const[selectedMonth,setSelectedMonth]=useState(()=>{const d=new Date();return `${d.getFullYear()}年${d.getMonth()+1}月`;});
@@ -555,7 +792,7 @@ export default function App(){
   return(<div style={{minHeight:"100vh",background:"#020817",fontFamily:"'Noto Sans SC',sans-serif",color:"#f1f5f9"}}>
     {showAdminLogin&&<AdminLoginModal onSuccess={()=>{setIsAdmin(true);setShowAdminLogin(false);}} onClose={()=>setShowAdminLogin(false)}/>}
     {showManage&&<ManageModal operators={operators} streamers={streamers} isAdmin={isAdmin} onClose={()=>setShowManage(false)} onSave={handleSaveManage}/>}
-    {showImport&&<ImportModal operators={operators} currentOpId={currentOpId} onImport={handleImport} onClose={()=>setShowImport(false)}/>}
+    {showImport&&<ImportModal operators={operators} currentOpId={currentOpId} onImport={handleImport} onClose={()=>setShowImport(false)} streamers={streamers} selectedWeek={selectedWeek} onWeekSelect={handleWeekSelect}/>}
     <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)",borderBottom:"1px solid #1e293b",padding:"0 20px",position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 24px rgba(0,0,0,0.45)"}}>
       <div style={{display:"flex",alignItems:"center",gap:12,height:54,flexWrap:"wrap"}}>
         <div onMouseDown={onLogoDown} onMouseUp={onLogoUp} onMouseLeave={onLogoUp} onTouchStart={onLogoDown} onTouchEnd={onLogoUp} style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,cursor:"pointer",userSelect:"none"}}>
