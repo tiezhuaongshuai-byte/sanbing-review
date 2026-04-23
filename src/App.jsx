@@ -327,49 +327,115 @@ function ImportModal({operators,currentOpId,onClose,streamers,selectedWeek,onWee
       const XLSX=window.XLSX;
       if(!XLSX){setMsg("Excel解析库加载中，请稍后重试");return;}
       const wb=XLSX.read(buf,{type:"array"});
-      const sheetName=wb.SheetNames.find(n=>n.includes("表3")||n.includes("开播数据")||n.includes("数据"))||wb.SheetNames[0];
+      const sheetName=wb.SheetNames.find(n=>n.includes("表3")||n.includes("开播数据"))||wb.SheetNames[0];
       const ws=wb.Sheets[sheetName];
       const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
       const blocks={};
       let curLabel=null;
+      let isCoopFile=false; // detect if this is 合作主播 format
 
-      for(let i=0;i<rows.length;i++){
-        const row=rows[i];
-        if(!row||row.every(v=>v===null))continue;
-        const col0=String(row[0]||"").trim();
-        const col1=String(row[1]||"").trim();
-        if(col0==="序列"||col0==="抖音昵称")continue;
+      // First pass: detect file type
+      for(let i=0;i<Math.min(rows.length,5);i++){
+        const r=rows[i];
+        if(!r)continue;
+        const c2=String(r[1]||"");
+        if(c2.includes("合作主播"))isCoopFile=true;
+      }
 
-        // Detect block header
-        if(row[3]===null||row[3]===undefined){
-          let label=null;
-          if(importType==="week"){
-            label=normalizeDate(col0);
-            if(!label){
-              const inTitle=(col0.match(/(\d+月\d+日?[-–]\d+月\d+日?)/)||col0.match(/(\d+\.\d+[-–]\d+\.\d+)/));
-              if(inTitle)label=normalizeDate(inTitle[1]);
-            }
-          } else {
-            label=normalizeMonth(col0);
+      if(isCoopFile){
+        // 合作主播格式: col2(index1) has title like "合作主播4月6日-4月12日周数据"
+        // headers row: 序列/主播昵称/抖音ID/场观/acu/直播时长h/备注
+        // data rows: col1=seq(int), col2=name, col3=tid, col4=uv, col5=acu, col6=liveH, col7=note
+        for(let i=0;i<rows.length;i++){
+          const r=rows[i];if(!r)continue;
+          const c2=String(r[1]||"").trim();
+          // Week header in col2
+          if(c2.includes("合作主播")&&c2.includes("周数据")){
+            const nd=normalizeDate(c2.replace("合作主播","").replace("周数据","").trim());
+            if(nd){curLabel=nd;if(!blocks[curLabel])blocks[curLabel]=[];continue;}
           }
-          if(label){curLabel=label;if(!blocks[curLabel])blocks[curLabel]=[];continue;}
-        }
-
-        // Data row
-        if(curLabel&&col1){
-          const rowLabel=importType==="week"?normalizeDate(col1):normalizeMonth(col1);
-          if(rowLabel){
-            const tid=String(row[3]||"").trim();
-            const name=String(row[2]||"").trim();
-            if(tid&&name&&name!=="抖音昵称"&&name!=="uv"){
+          // Skip header rows
+          if(c2==="主播昵称"||c2==="合计"||c2==="备注")continue;
+          // Data row: col1 is integer sequence
+          if(curLabel&&r[0]!==null&&typeof r[0]==="number"&&Number.isInteger(r[0])){
+            const name=String(r[1]||"").trim();
+            const tid=String(r[2]||"").trim();
+            if(name&&tid&&name!=="主播昵称"){
               blocks[curLabel].push({
                 tid,name,
-                uv:row[4]!==null?String(row[4]):"",
-                acu:row[5]!==null?String(row[5]):"",
-                peak:row[6]!==null?String(row[6]):"",
-                liveDuration:parseDuration(row[7]),
-                stay:row[8]!==null?String(row[8]):"",
+                uv:r[3]!==null?String(r[3]):"",
+                acu:r[4]!==null?String(r[4]):"",
+                peak:"",
+                liveDuration:r[5]!==null?String(r[5]):"",
+                stay:"",
+                note:r[6]!==null?String(r[6]):"",
               });
+            }
+          }
+        }
+      } else {
+        // 在会主播格式 (both 大表 and 独立表):
+        // Week header: col1 has date title, OR col1="序列" and col2 has date title
+        // headers: 序列/抖音昵称/抖音号/uv/acu/pcu/时长/人均观看时长/备注
+        // data rows: col1=int seq, col2=name, col3=tid, col4=uv...
+        // Also handles big file format where col2 has date in "开播时间" column
+        for(let i=0;i<rows.length;i++){
+          const r=rows[i];if(!r)continue;
+          const c1=String(r[0]||"").trim();
+          const c2=String(r[1]||"").trim();
+
+          // Week header detection
+          let label=null;
+          // Format 1: col1 has full date title like "3月23日-3月28日周数据"
+          if(c1&&r[1]===null){
+            const nd=normalizeDate(c1.replace(/[日周数据]+$/,"").trim());
+            if(!nd){
+              // Try extracting date from title like "在会主播3月30日-4月5日日周数据"
+              const m=(c1.match(/(\d+月\d+日?[-–]\d+月\d+日?)/)||c1.match(/(\d+\.\d+[-–]\d+\.\d+)/));
+              if(m)label=normalizeDate(m[1]);
+            } else { label=nd; }
+          }
+          // Format 2: col1="序列" and col2 has date like "4月6日-4月12日周数据"
+          if(!label&&c1==="序列"&&c2&&c2!=="抖音昵称"){
+            const nd=normalizeDate(c2.replace("周数据","").trim());
+            if(nd)label=nd;
+          }
+          if(label){curLabel=label;if(!blocks[curLabel])blocks[curLabel]=[];continue;}
+
+          // Skip non-data rows
+          if(c1==="序列"||c1==="合计"||c2==="抖音昵称")continue;
+
+          // Data row: col1 is integer
+          if(curLabel&&r[0]!==null&&typeof r[0]==="number"&&Number.isInteger(r[0])){
+            const name=String(r[1]||"").trim();
+            const tid=String(r[2]||"").trim();
+            if(name&&tid&&name!=="抖音昵称"&&name!=="uv"){
+              blocks[curLabel].push({
+                tid,name,
+                uv:r[3]!==null?String(r[3]):"",
+                acu:r[4]!==null?String(r[4]):"",
+                peak:r[5]!==null?String(r[5]):"",
+                liveDuration:parseDuration(r[6]),
+                stay:r[7]!==null?String(r[7]):"",
+              });
+            }
+          }
+          // Also handle big file format where col2 has the date (开播时间 column)
+          else if(curLabel&&r[0]!==null&&typeof r[0]==="number"&&r[1]!==null){
+            const rowDate=normalizeDate(String(r[1]||""));
+            if(rowDate){
+              const name=String(r[2]||"").trim();
+              const tid=String(r[3]||"").trim();
+              if(name&&tid&&name!=="抖音昵称"){
+                blocks[curLabel].push({
+                  tid,name,
+                  uv:r[4]!==null?String(r[4]):"",
+                  acu:r[5]!==null?String(r[5]):"",
+                  peak:r[6]!==null?String(r[6]):"",
+                  liveDuration:parseDuration(r[7]),
+                  stay:r[8]!==null?String(r[8]):"",
+                });
+              }
             }
           }
         }
@@ -378,9 +444,9 @@ function ImportModal({operators,currentOpId,onClose,streamers,selectedWeek,onWee
       const validLabels=Object.keys(blocks).filter(k=>blocks[k].length>0);
       if(validLabels.length===0){setMsg("未识别到数据，请确认文件格式或选择正确的导入类型");return;}
       setParsedBlocks(blocks);
-      setSelectedBlocks(validLabels); // default select all
+      setSelectedBlocks(validLabels);
       setMode("select");
-      setMsg("识别到 "+validLabels.length+" 个"+( importType==="week"?"周期":"月份")+"数据");
+      setMsg("识别到 "+validLabels.length+" 个"+(importType==="week"?"周期":"月份")+"数据，共 "+validLabels.reduce((s,k)=>s+blocks[k].length,0)+" 条记录");
     }catch(err){setMsg("解析失败："+err.message);}
   };
 
@@ -408,9 +474,23 @@ function ImportModal({operators,currentOpId,onClose,streamers,selectedWeek,onWee
       const actualOpId=r.matched.opId||opId;
       const key=actualOpId+"|||"+r._label;
       if(!byOpLabel[key])byOpLabel[key]={opId:actualOpId,label:r._label,records:{}};
-      byOpLabel[key].records[r.matched.id]={
-        uv:r.uv||"",acu:r.acu||"",peak:r.peak||"",
-        liveDuration:r.liveDuration||"",stay:r.stay||"",
+      const isCoop=r.matched.group==="合作";
+      byOpLabel[key].records[r.matched.id]=isCoop?{
+        // 合作主播字段: 直播时长h、场观UV、ACU、备注
+        liveDuration:r.liveDuration||"",
+        uv:r.uv||"",
+        acu:r.acu||"",
+        peak:"",stay:"",exposure:"",interact:"",fans:"",
+        script:"",bgm:"",hotspot:"",activity:"",
+        highlight:r.note||"",  // 备注写到highlight
+        problem:"",nextplan:"",rating:""
+      }:{
+        // 在会主播字段: 开播时长h、UV、ACU、PCU、人均观看时长
+        liveDuration:r.liveDuration||"",
+        uv:r.uv||"",
+        acu:r.acu||"",
+        peak:r.peak||"",
+        stay:r.stay||"",  // 人均观看时长(min)
         exposure:"",interact:"",fans:"",
         script:"",bgm:"",hotspot:"",activity:"",highlight:"",problem:"",nextplan:"",rating:""
       };
