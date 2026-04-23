@@ -191,6 +191,27 @@ function parseStreamersCSV(csv) {
   }).filter(s => s.name);
 }
 
+// Coop streamers (合作主播) - managed by 宋帅
+const COOP_STREAMERS = [
+  {id:"s_coop_1",name:"懒大王",tid:"mmm_714",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_2",name:"小饼干",tid:"75899298077",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_3",name:"猫神",tid:"JBM666",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_4",name:"最强零氪",tid:"dycf491036",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_5",name:"小梨",tid:"weibaweiba1231",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_6",name:"小丸",tid:"1208444435",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_7",name:"什刹海",tid:"46380510043",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_8",name:"齐衡三",tid:"359921613",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_9",name:"陌小伟",tid:"55053674381",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_10",name:"俊爷男",tid:"60767255423",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_11",name:"大黑牛",tid:"1107944117",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_12",name:"南屿",tid:"Yu50802083",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_13",name:"陈平安",tid:"jl4115210000",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_14",name:"风",tid:"105072456034",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_15",name:"懒宝",tid:"",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+  {id:"s_coop_16",name:"葵葵子",tid:"",phone:"",realname:"",operator:"宋帅",opId:"op_songshuai",group:"合作",deleted:false,signDate:"",firstLiveDate:""},
+];
+
+
 const DATA_FIELDS = [
   {key:"liveDuration",short:"开播时长\n(小时)",w:78,ph:"0"},
   {key:"exposure",short:"曝光",w:70,ph:"0"},
@@ -561,6 +582,153 @@ function ManageModal({operators,streamers,isAdmin,onClose,onSave}){
 const TH=(bg,color="#94a3b8",ex={})=>({padding:"7px 6px",border:"1px solid #1e293b",fontSize:10,fontWeight:700,fontFamily:"'Noto Sans SC',sans-serif",background:bg,color,whiteSpace:"pre-line",lineHeight:1.3,verticalAlign:"middle",textAlign:"center",...ex});
 const TD=(bg,ex={})=>({border:"1px solid #0d1929",background:bg,verticalAlign:"middle",fontFamily:"'Noto Sans SC',sans-serif",padding:"4px 6px",...ex});
 
+
+// ─── STREAMER ROSTER (主播花名册) ────────────────────────────────
+function StreamerRoster({operators,streamers,isAdmin,currentOpId,onSave}){
+  const[filterOp,setFilterOp]=useState("all");
+  const[filterLive,setFilterLive]=useState("all"); // all|live|notlive
+  const[search,setSearch]=useState("");
+  const[editId,setEditId]=useState(null);
+  const[editData,setEditData]=useState({});
+  const[newRow,setNewRow]=useState({name:"",tid:"",phone:"",realname:"",signDate:"",firstLiveDate:"",operator:"",opId:"",group:"公会",note:""});
+  const[showAdd,setShowAdd]=useState(false);
+
+  const guildStrs=streamers.filter(s=>!s.deleted&&!s.deleteRequested&&s.group!=="合作");
+  const filtered=guildStrs.filter(s=>{
+    if(filterOp!=="all"&&s.opId!==filterOp)return false;
+    if(filterLive==="live"&&!isLiveMark(s))return false;
+    if(filterLive==="notlive"&&isLiveMark(s))return false;
+    if(search&&!s.name.includes(search)&&!s.tid.includes(search))return false;
+    return true;
+  });
+
+  function isLiveMark(s){
+    // Live if liveHours >= 1 (stored in s.liveHours) or firstLiveDate set
+    return parseFloat(s.liveHours||0)>=1;
+  }
+
+  const startEdit=(s)=>{setEditId(s.id);setEditData({...s});};
+  const saveEdit=()=>{
+    const updated=streamers.map(s=>s.id===editId?{...s,...editData}:s);
+    onSave(updated);setEditId(null);
+  };
+  const upd=(f,v)=>setEditData(p=>({...p,[f]:v}));
+
+  const addRow=()=>{
+    if(!newRow.name.trim())return;
+    const op=operators.find(o=>o.id===newRow.opId)||operators[0];
+    const s={id:"s_r_"+Date.now(),...newRow,operator:op?.name||"",opId:op?.id||operators[0]?.id,deleted:false,deleteRequested:false,liveHours:0};
+    onSave([...streamers,s]);
+    setNewRow({name:"",tid:"",phone:"",realname:"",signDate:"",firstLiveDate:"",operator:"",opId:"",group:"公会",note:""});
+    setShowAdd(false);
+  };
+
+  const inp=(v,f,w=100,ph="")=>editId&&editData.id===editId
+    ?<input value={editData[f]||""} onChange={e=>upd(f,e.target.value)} style={{width:w,background:"#1e293b",border:"1px solid #6366F1",borderRadius:4,color:"#f1f5f9",padding:"2px 5px",fontSize:11,fontFamily:"'Noto Sans SC',sans-serif"}}/>
+    :<span>{v||"-"}</span>;
+
+  const liveStrs=filtered.filter(s=>isLiveMark(s));
+  const totalH=filtered.reduce((sum,s)=>sum+(parseFloat(s.liveHours)||0),0);
+
+  const thS={padding:"8px 10px",background:"#0a1628",color:"#64748B",fontSize:11,fontWeight:700,textAlign:"left",borderBottom:"1px solid #1e293b",whiteSpace:"nowrap",position:"sticky",top:0};
+  const tdS=(bg,ex={})=>({padding:"7px 9px",background:bg,fontSize:12,border:"1px solid #0d1929",verticalAlign:"middle",...ex});
+
+  return(<div>
+    {/* Summary bar */}
+    <div style={{display:"flex",gap:14,marginBottom:14,background:"#0f172a",borderRadius:10,padding:"12px 16px",border:"1px solid #1e293b",flexWrap:"wrap",alignItems:"center"}}>
+      <div><span style={{color:"#64748B",fontSize:12}}>总主播数：</span><span style={{color:"#f1f5f9",fontWeight:700,fontSize:15}}>{filtered.length}</span></div>
+      <div style={{width:1,height:18,background:"#1e293b"}}/>
+      <div><span style={{color:"#64748B",fontSize:12}}>开播（≥1h）：</span><span style={{color:"#10B981",fontWeight:800,fontSize:15}}>{liveStrs.length}</span><span style={{color:"#334155",fontSize:12}}> / {filtered.length}</span></div>
+      <div style={{width:1,height:18,background:"#1e293b"}}/>
+      <div><span style={{color:"#64748B",fontSize:12}}>总时长：</span><span style={{color:"#F59E0B",fontWeight:700,fontSize:15}}>{totalH.toFixed(1)}h</span></div>
+      <div style={{flex:1}}/>
+      {(isAdmin||currentOpId)&&<button onClick={()=>setShowAdd(s=>!s)} style={{padding:"6px 14px",background:"#6366F1",border:"none",borderRadius:7,color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Noto Sans SC',sans-serif"}}>+ 新增主播</button>}
+    </div>
+
+    {/* Filters */}
+    <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜索昵称/抖音ID..." style={{padding:"6px 11px",background:"#1e293b",border:"1px solid #334155",borderRadius:7,color:"#f1f5f9",fontSize:12,outline:"none",fontFamily:"'Noto Sans SC',sans-serif",width:180}}/>
+      <div style={{display:"flex",gap:4,padding:"3px",background:"#0f172a",borderRadius:7,border:"1px solid #1e293b"}}>
+        {[["all","全部"],["live","✅ 已开播"],["notlive","未开播"]].map(([v,l])=>(
+          <button key={v} onClick={()=>setFilterLive(v)} style={{padding:"4px 11px",borderRadius:5,border:"none",background:filterLive===v?"#6366F1":"transparent",color:filterLive===v?"#fff":"#64748B",cursor:"pointer",fontSize:11,fontFamily:"'Noto Sans SC',sans-serif"}}>{l}</button>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:4,padding:"3px",background:"#0f172a",borderRadius:7,border:"1px solid #1e293b",overflowX:"auto",maxWidth:"55vw"}}>
+        <button onClick={()=>setFilterOp("all")} style={{padding:"4px 11px",borderRadius:5,border:"none",background:filterOp==="all"?"#6366F1":"transparent",color:filterOp==="all"?"#fff":"#64748B",cursor:"pointer",fontSize:11,fontFamily:"'Noto Sans SC',sans-serif",whiteSpace:"nowrap"}}>全部运营</button>
+        {operators.map(op=>(<button key={op.id} onClick={()=>setFilterOp(op.id)} style={{padding:"4px 11px",borderRadius:5,border:"none",background:filterOp===op.id?op.color:"transparent",color:filterOp===op.id?"#fff":"#64748B",cursor:"pointer",fontSize:11,fontFamily:"'Noto Sans SC',sans-serif",whiteSpace:"nowrap"}}>{op.name}</button>))}
+      </div>
+    </div>
+
+    {/* Add row */}
+    {showAdd&&(<div style={{background:"#080f1e",borderRadius:10,padding:14,marginBottom:12,border:"1px solid #6366F133"}}>
+      <div style={{color:"#6366F1",fontWeight:700,fontSize:13,marginBottom:10}}>+ 新增主播</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:10}}>
+        {[["name","昵称*"],["tid","抖音号*"],["phone","手机尾号"],["realname","实名"]].map(([f,l])=>(
+          <div key={f}><div style={{color:"#64748B",fontSize:10,marginBottom:3}}>{l}</div><input value={newRow[f]} onChange={e=>setNewRow(p=>({...p,[f]:e.target.value}))} style={{width:"100%",padding:"5px 8px",background:"#1e293b",border:"1px solid #334155",borderRadius:6,color:"#f1f5f9",fontSize:12,outline:"none",fontFamily:"'Noto Sans SC',sans-serif",boxSizing:"border-box"}}/></div>
+        ))}
+        <div><div style={{color:"#64748B",fontSize:10,marginBottom:3}}>归属运营</div><select value={newRow.opId} onChange={e=>setNewRow(p=>({...p,opId:e.target.value}))} style={{width:"100%",padding:"5px 8px",background:"#1e293b",border:"1px solid #334155",borderRadius:6,color:"#f1f5f9",fontSize:12,outline:"none",fontFamily:"'Noto Sans SC',sans-serif"}}><option value="">请选择</option>{operators.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></div>
+        <div><div style={{color:"#64748B",fontSize:10,marginBottom:3}}>签约日期</div><input type="date" value={newRow.signDate} onChange={e=>setNewRow(p=>({...p,signDate:e.target.value}))} style={{width:"100%",padding:"5px 8px",background:"#1e293b",border:"1px solid #334155",borderRadius:6,color:"#f1f5f9",fontSize:12,outline:"none",fontFamily:"'Noto Sans SC',sans-serif"}}/></div>
+        <div><div style={{color:"#64748B",fontSize:10,marginBottom:3}}>首播日期</div><input type="date" value={newRow.firstLiveDate} onChange={e=>setNewRow(p=>({...p,firstLiveDate:e.target.value}))} style={{width:"100%",padding:"5px 8px",background:"#1e293b",border:"1px solid #334155",borderRadius:6,color:"#f1f5f9",fontSize:12,outline:"none",fontFamily:"'Noto Sans SC',sans-serif"}}/></div>
+      </div>
+      <div style={{display:"flex",gap:8}}><button onClick={addRow} style={{padding:"6px 16px",background:"#6366F1",border:"none",borderRadius:7,color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Noto Sans SC',sans-serif"}}>确认添加</button><button onClick={()=>setShowAdd(false)} style={{padding:"6px 14px",background:"#334155",border:"none",borderRadius:7,color:"#94a3b8",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans SC',sans-serif"}}>取消</button></div>
+    </div>)}
+
+    {/* Table */}
+    <div style={{overflowX:"auto",borderRadius:11,border:"1px solid #1e293b"}}>
+      <table style={{borderCollapse:"collapse",minWidth:960,width:"100%"}}>
+        <thead>
+          <tr>
+            {["序号","开播","抖音昵称","抖音号","手机尾号","实名","归属运营","签约日期","首播日期","备注",isAdmin?"操作":""].filter(Boolean).map(h=>(
+              <th key={h} style={thS}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((s,i)=>{
+            const op=operators.find(o=>o.id===s.opId);const bg=i%2===0?"#080f1e":"#0a1628";
+            const live=isLiveMark(s);
+            const isEditing=editId===s.id;
+            return(<tr key={s.id}>
+              <td style={tdS(bg,{color:"#475569",width:36,textAlign:"center"})}>{i+1}</td>
+              <td style={tdS(bg,{textAlign:"center",width:42})}>
+                {live?<span style={{fontSize:16}}>✅</span>:<span style={{color:"#334155",fontSize:12}}>—</span>}
+              </td>
+              <td style={tdS(bg,{fontWeight:700,color:"#f1f5f9"})}>
+                {isEditing?<input value={editData.name||""} onChange={e=>upd("name",e.target.value)} style={{width:130,background:"#1e293b",border:"1px solid #6366F1",borderRadius:4,color:"#f1f5f9",padding:"2px 5px",fontSize:11}}/>:s.name}
+              </td>
+              <td style={tdS(bg,{color:"#64748B",fontSize:11})}>{s.tid}</td>
+              <td style={tdS(bg,{color:"#64748B"})}>
+                {isEditing?<input value={editData.phone||""} onChange={e=>upd("phone",e.target.value)} style={{width:70,background:"#1e293b",border:"1px solid #6366F1",borderRadius:4,color:"#f1f5f9",padding:"2px 5px",fontSize:11}}/>:s.phone||"-"}
+              </td>
+              <td style={tdS(bg,{color:"#94a3b8"})}>
+                {isEditing?<input value={editData.realname||""} onChange={e=>upd("realname",e.target.value)} style={{width:80,background:"#1e293b",border:"1px solid #6366F1",borderRadius:4,color:"#f1f5f9",padding:"2px 5px",fontSize:11}}/>:s.realname||"-"}
+              </td>
+              <td style={tdS(bg)}>
+                {isEditing?(<select value={editData.opId||""} onChange={e=>{const op=operators.find(o=>o.id===e.target.value);upd("opId",e.target.value);upd("operator",op?.name||"");}} style={{background:"#1e293b",border:"1px solid #6366F1",borderRadius:4,color:"#f1f5f9",padding:"2px 5px",fontSize:11}}>{operators.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>)
+                :(<span style={{color:op?.color||"#94a3b8",fontWeight:700,fontSize:11}}>{op?.name||"-"}</span>)}
+              </td>
+              <td style={tdS(bg,{color:"#94a3b8",fontSize:11})}>
+                {isEditing?<input type="date" value={editData.signDate||""} onChange={e=>upd("signDate",e.target.value)} style={{background:"#1e293b",border:"1px solid #6366F1",borderRadius:4,color:"#f1f5f9",padding:"2px 4px",fontSize:11}}/>:s.signDate||"-"}
+              </td>
+              <td style={tdS(bg,{color:"#94a3b8",fontSize:11})}>
+                {isEditing?<input type="date" value={editData.firstLiveDate||""} onChange={e=>upd("firstLiveDate",e.target.value)} style={{background:"#1e293b",border:"1px solid #6366F1",borderRadius:4,color:"#f1f5f9",padding:"2px 4px",fontSize:11}}/>:s.firstLiveDate||"-"}
+              </td>
+              <td style={tdS(bg,{color:"#64748B",fontSize:11})}>
+                {isEditing?<input value={editData.note||""} onChange={e=>upd("note",e.target.value)} style={{width:120,background:"#1e293b",border:"1px solid #6366F1",borderRadius:4,color:"#f1f5f9",padding:"2px 5px",fontSize:11}}/>:s.note||""}
+              </td>
+              {isAdmin&&(<td style={tdS(bg)}>
+                {isEditing
+                  ?<div style={{display:"flex",gap:4}}><button onClick={saveEdit} style={{padding:"2px 8px",background:"#10B981",border:"none",borderRadius:4,color:"#fff",cursor:"pointer",fontSize:11,fontFamily:"'Noto Sans SC',sans-serif"}}>保存</button><button onClick={()=>setEditId(null)} style={{padding:"2px 8px",background:"#334155",border:"none",borderRadius:4,color:"#94a3b8",cursor:"pointer",fontSize:11,fontFamily:"'Noto Sans SC',sans-serif"}}>取消</button></div>
+                  :<button onClick={()=>startEdit(s)} style={{padding:"2px 8px",background:"#1e293b",border:"1px solid #475569",borderRadius:4,color:"#94a3b8",cursor:"pointer",fontSize:11,fontFamily:"'Noto Sans SC',sans-serif"}}>编辑</button>}
+              </td>)}
+            </tr>);
+          })}
+        </tbody>
+      </table>
+    </div>
+  </div>);
+}
+
 function Dashboard({operators,streamers,allWeeks}){
   const[loading,setLoading]=useState(true);const[weekData,setWeekData]=useState({});const[viewOp,setViewOp]=useState("all");
   const now=new Date();const getWL=date=>{const d=new Date(date);while(d.getDay()!==1)d.setDate(d.getDate()-1);const end=new Date(d);end.setDate(end.getDate()+6);const f=x=>`${x.getMonth()+1}.${String(x.getDate()).padStart(2,"0")}`;return `${f(d)} - ${f(end)}`;};
@@ -634,21 +802,17 @@ function WeeklyView({weekKey,myStreamers}){
 
   // Data fields for guild streamers (full)
   const GUILD_FIELDS=[
-    {key:"liveDuration",short:"开播时长\n(h)",w:72,ph:"0"},
-    {key:"exposure",short:"曝光",w:70,ph:"0"},
-    {key:"uv",short:"UV\n(场观)",w:70,ph:"0"},
-    {key:"acu",short:"ACU",w:65,ph:"0"},
-    {key:"peak",short:"PCU\n峰值",w:65,ph:"0"},
-    {key:"stay",short:"停留\n(s)",w:65,ph:"0"},
-    {key:"interact",short:"互动率\n%",w:60,ph:"0"},
-    {key:"fans",short:"粉丝\n净增",w:60,ph:"0"},
+    {key:"liveDuration",short:"开播时长\n(h)",w:75,ph:"0"},
+    {key:"uv",short:"UV\n(场观)",w:75,ph:"0"},
+    {key:"acu",short:"ACU",w:68,ph:"0"},
+    {key:"peak",short:"PCU\n峰值",w:68,ph:"0"},
+    {key:"stay",short:"人均观看\n时长(min)",w:78,ph:"0"},
   ];
   // Data fields for coop streamers (simplified)
   const COOP_FIELDS=[
-    {key:"liveDuration",short:"直播时长\n(h)",w:80,ph:"0"},
-    {key:"uv",short:"场观\nUV",w:80,ph:"0"},
-    {key:"acu",short:"ACU",w:75,ph:"0"},
-    {key:"fans",short:"粉丝\n净增",w:70,ph:"0"},
+    {key:"liveDuration",short:"直播时长\n(h)",w:85,ph:"0"},
+    {key:"uv",short:"场观UV",w:85,ph:"0"},
+    {key:"acu",short:"ACU",w:72,ph:"0"},
   ];
 
   if(!weekKey)return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:380,color:"#334155"}}><div style={{textAlign:"center"}}><div style={{fontSize:46,marginBottom:12}}>📅</div><div style={{fontSize:17,fontWeight:700,color:"#475569",marginBottom:6}}>请先选择复盘周期</div></div></div>);
@@ -680,6 +844,15 @@ function WeeklyView({weekKey,myStreamers}){
           <div><div style={{color:"#475569",fontSize:10}}>总时长</div><div style={{color:"#F59E0B",fontWeight:800,fontSize:18}}>{coopHours>0?coopHours.toFixed(1):"--"}<span style={{color:"#334155",fontSize:12}}>h</span></div></div>
         </div>
       </div>
+    </div>
+
+    {/* 项目总计 bar */}
+    <div style={{display:"flex",gap:16,marginBottom:12,background:"linear-gradient(135deg,#1e1b4b,#0f172a)",borderRadius:10,padding:"12px 18px",border:"1px solid #6366F144",alignItems:"center",flexWrap:"wrap"}}>
+      <span style={{color:"#A78BFA",fontSize:11,fontWeight:700}}>🏆 项目总计</span>
+      <div style={{width:1,height:16,background:"#334155"}}/>
+      <div><span style={{color:"#64748B",fontSize:12}}>总UV：</span><span style={{color:"#F59E0B",fontWeight:900,fontSize:18}}>{(guildUV+coopUV)>0?(guildUV+coopUV).toLocaleString():"--"}</span><span style={{color:"#475569",fontSize:11,marginLeft:6}}>(在会{guildUV>0?guildUV.toLocaleString():"0"} + 合作{coopUV>0?coopUV.toLocaleString():"0"})</span></div>
+      <div style={{width:1,height:16,background:"#334155"}}/>
+      <div><span style={{color:"#64748B",fontSize:12}}>总时长：</span><span style={{color:"#F59E0B",fontWeight:700,fontSize:16}}>{(guildHours+coopHours)>0?(guildHours+coopHours).toFixed(1):"--"}<span style={{color:"#475569",fontSize:11}}>h</span></span><span style={{color:"#475569",fontSize:11,marginLeft:6}}>(在会{guildHours>0?guildHours.toFixed(1):"0"}h + 合作{coopHours>0?coopHours.toFixed(1):"0"}h)</span></div>
     </div>
 
     {/* Sub tabs + save */}
@@ -820,7 +993,7 @@ export default function App(){
       if(strs){setStreamers(strs);}
       else{
         // First run: parse and save the 157 streamers
-        const initStrs=parseStreamersCSV(STREAMER_CSV);
+        const initStrs=[...parseStreamersCSV(STREAMER_CSV),...COOP_STREAMERS];
         await dbSet("__streamers__",initStrs);
         setStreamers(initStrs);
       }
@@ -863,6 +1036,7 @@ export default function App(){
       {tab==="dashboard"&&<Dashboard operators={operators} streamers={streamers.filter(s=>!s.deleted&&!s.deleteRequested)} allWeeks={allWeeks}/>}
       {tab==="weekly"&&<WeeklyView weekKey={selectedWeek?getWeekKey(currentOpId,selectedWeek):null} myStreamers={myStreamers}/>}
       {tab==="monthly"&&<MonthlyView operators={operators} streamers={streamers} allWeeks={allWeeks} currentOpId={currentOpId}/>}
+      {tab==="roster"&&<StreamerRoster operators={operators} streamers={streamers} isAdmin={isAdmin} currentOpId={currentOpId} onSave={async(updated)=>{setStreamers(updated);await dbSet("__streamers__",updated);}}/>}
       {tab==="trend"&&<div style={{textAlign:"center",padding:"80px 0",color:"#334155"}}><div style={{fontSize:40,marginBottom:12}}>📈</div><div style={{fontSize:15,fontWeight:600,color:"#475569"}}>趋势分析</div><div style={{fontSize:13,marginTop:8}}>积累几周数据后自动呈现</div></div>}
     </div>
   </div>);
