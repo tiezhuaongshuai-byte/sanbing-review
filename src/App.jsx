@@ -467,6 +467,20 @@ function ImportModal({operators,currentOpId,onClose,streamers,selectedWeek,onWee
           {/* Format hint */}
           <div style={{background:"#080f1e",borderRadius:10,padding:14,marginBottom:14,border:"1px solid #1e293b",fontSize:12,color:"#64748B",lineHeight:1.8}}>
             {importType==="week"?(<>
+            <div style={{marginBottom:6,color:"#6366F1",fontWeight:700,fontSize:12}}>📋 在会主播周数据格式：</div>
+            <div style={{marginBottom:2,fontSize:11,color:"#94a3b8"}}>第1行：周期标题（如「4月20日-4月26日周数据」）</div>
+            <div style={{marginBottom:2,fontSize:11,color:"#94a3b8"}}>第2行：序列 / 抖音昵称 / <span style={{color:"#6366F1",fontWeight:700}}>抖音号</span> / uv / acu / pcu / 时长 / 人均观看时长 / 备注</div>
+            <div style={{marginBottom:8,fontSize:11,color:"#94a3b8"}}>第3行起：每行一个主播</div>
+            <div style={{marginBottom:6,color:"#10B981",fontWeight:700,fontSize:12}}>📋 合作主播周数据格式：</div>
+            <div style={{marginBottom:2,fontSize:11,color:"#94a3b8"}}>第1行：空 / 合作主播X月X日-X月X日周数据</div>
+            <div style={{marginBottom:8,fontSize:11,color:"#94a3b8"}}>第2行：序列 / 主播昵称 / <span style={{color:"#10B981",fontWeight:700}}>抖音ID</span> / 场观 / acu / 直播时长h / 备注</div>
+            <div style={{fontSize:11,color:"#6366F1",fontWeight:600}}>✅ 自动识别日期 · 抖音ID精准匹配 · 支持一次导入全部周期</div>
+          </>):(<>
+            <div style={{marginBottom:6,color:"#10B981",fontWeight:700,fontSize:12}}>📋 月数据格式（同周数据，改标题为月份）：</div>
+            <div style={{marginBottom:2,fontSize:11,color:"#94a3b8"}}>第1行：月份标题（如「2026年4月月数据」）</div>
+            <div style={{marginBottom:8,fontSize:11,color:"#94a3b8"}}>第2行：序列 / 抖音昵称 / <span style={{color:"#10B981",fontWeight:700}}>抖音号</span> / uv / acu / pcu / 时长 / 备注</div>
+            <div style={{fontSize:11,color:"#6366F1",fontWeight:600}}>✅ 单独存储月数据，不和周数据混淆</div>
+          </>)}{importType==="week"?(<>
               ✅ 支持你现有的 Excel 格式（列：序列 / 开播时间 / 抖音昵称 / <span style={{color:"#6366F1",fontWeight:700}}>抖音ID</span> / uv / acu / pcu / 时长）<br/>
               ✅ 自动识别所有周期（支持「4月13日-4月19日」「3月30-4月5日」「12.8-12.14」等格式）<br/>
               ✅ 用<span style={{color:"#6366F1",fontWeight:700}}>抖音ID精准匹配</span>，不受昵称变化影响<br/>
